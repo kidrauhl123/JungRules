@@ -43,13 +43,13 @@ rules:
 
 ## Quantumult X
 
-完整规则：
+完整配置，导入后会带上策略组和分流：
 
 ```conf
-https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/all.list, tag=JungRules, update-interval=86400, opt-parser=true, enabled=true
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/profile.conf
 ```
 
-只引用美国节点补充：
+只想额外引用某个规则资源时，再用 `.list` 文件，例如：
 
 ```conf
 https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/by-policy/us.list, tag=美国节点补充, force-policy=美国节点, update-interval=86400, opt-parser=true, enabled=true
@@ -60,7 +60,8 @@ https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/by-polic
 - `clash/by-policy/`：Clash/FlClash 通用，`behavior: classical`
 - `clash/domain/`：Clash 域名文本规则，`behavior: domain`
 - `clash/ipcidr/`：Clash IP 段文本规则，`behavior: ipcidr`
-- `quantumult/all.list`：QX 完整规则
+- `quantumult/profile.conf`：QX 完整配置，包含策略组和分流
+- `quantumult/all.list`：QX 规则资源，不包含策略组
 - `quantumult/by-policy/`：QX 按策略拆分
 - `quantumult/by-resource/`：QX 按原始资源标签拆分
 
