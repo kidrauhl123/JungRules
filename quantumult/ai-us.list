@@ -1,0 +1,102 @@
+# AI common dependencies
+DOMAIN,api.statsig.com,美国节点
+DOMAIN,browser-intake-datadoghq.com,美国节点
+DOMAIN,static.cloudflareinsights.com,美国节点
+DOMAIN-SUFFIX,algolia.net,美国节点
+DOMAIN-SUFFIX,auth0.com,美国节点
+DOMAIN-SUFFIX,cloudflare.com,美国节点
+DOMAIN-SUFFIX,arkoselabs.com,美国节点
+DOMAIN-SUFFIX,statsigapi.net,美国节点
+DOMAIN-SUFFIX,featuregates.org,美国节点
+DOMAIN-SUFFIX,identrust.com,美国节点
+DOMAIN-SUFFIX,intercom.io,美国节点
+DOMAIN-SUFFIX,intercomcdn.com,美国节点
+DOMAIN-SUFFIX,launchdarkly.com,美国节点
+DOMAIN-SUFFIX,segment.io,美国节点
+DOMAIN-SUFFIX,amazonaws.com,美国节点
+DOMAIN-SUFFIX,wp.com,美国节点
+DOMAIN-SUFFIX,sentry.io,美国节点
+DOMAIN-SUFFIX,stripe.com,美国节点
+DOMAIN,cdn.usefathom.com,美国节点
+
+# Claude / Anthropic
+DOMAIN-SUFFIX,anthropic.com,美国节点
+DOMAIN-SUFFIX,claude.ai,美国节点
+DOMAIN-SUFFIX,claude.com,美国节点
+DOMAIN-SUFFIX,claudeusercontent.com,美国节点
+
+# OpenAI / ChatGPT
+DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net,美国节点
+DOMAIN,openaicomproductionae4b.blob.core.windows.net,美国节点
+DOMAIN,production-openaicom-storage.azureedge.net,美国节点
+DOMAIN-SUFFIX,ai.com,美国节点
+DOMAIN-SUFFIX,chatgpt.com,美国节点
+DOMAIN-SUFFIX,livekit.cloud,美国节点
+DOMAIN-SUFFIX,oaistatic.com,美国节点
+DOMAIN-SUFFIX,oaiusercontent.com,美国节点
+DOMAIN-SUFFIX,openai.com,美国节点
+DOMAIN-SUFFIX,azureedge.net,美国节点
+DOMAIN-SUFFIX,imgix.net,美国节点
+
+# Gemini / Google AI
+DOMAIN,ai.google.dev,美国节点
+DOMAIN,makersuite.google.com,美国节点
+DOMAIN-SUFFIX,gemini.google.com,美国节点
+DOMAIN-SUFFIX,apis.google.com,美国节点
+DOMAIN-SUFFIX,clients6.google.com,美国节点
+DOMAIN-SUFFIX,clients4.google.com,美国节点
+DOMAIN-SUFFIX,deepmind.com,美国节点
+DOMAIN-SUFFIX,deepmind.google,美国节点
+DOMAIN-SUFFIX,generativeai.google,美国节点
+DOMAIN-SUFFIX,colab.google.com,美国节点
+DOMAIN-SUFFIX,colab.research.google.com,美国节点
+DOMAIN-SUFFIX,developerprofiles.google.com,美国节点
+DOMAIN-SUFFIX,googleusercontent.com,美国节点
+DOMAIN-SUFFIX,googleapis.com,美国节点
+DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,美国节点
+
+# Copilot / Bing AI
+DOMAIN,api.msn.com,美国节点
+DOMAIN,assets.msn.com,美国节点
+DOMAIN,copilot.microsoft.com,美国节点
+DOMAIN,gateway.bingviz.microsoft.net,美国节点
+DOMAIN,gateway.bingviz.microsoftapp.net,美国节点
+DOMAIN,in.appcenter.ms,美国节点
+DOMAIN,location.microsoft.com,美国节点
+DOMAIN,odc.officeapps.live.com,美国节点
+DOMAIN,r.bing.com,美国节点
+DOMAIN,self.events.data.microsoft.com,美国节点
+DOMAIN,services.bingapis.com,美国节点
+DOMAIN,sydney.bing.com,美国节点
+DOMAIN,www.bing.com,美国节点
+DOMAIN-SUFFIX,api.microsoftapp.net,美国节点
+DOMAIN-SUFFIX,bing-shopping.microsoft-falcon.io,美国节点
+DOMAIN-SUFFIX,edgeservices.bing.com,美国节点
+
+# Perplexity
+DOMAIN,pplx-res.cloudinary.com,美国节点
+DOMAIN-SUFFIX,perplexity.ai,美国节点
+DOMAIN-SUFFIX,pplx.ai,美国节点
+DOMAIN-SUFFIX,perplexity.com,美国节点
+
+# Poe
+DOMAIN-SUFFIX,poe.com,美国节点
+DOMAIN-SUFFIX,poecdn.net,美国节点
+
+# Grok
+DOMAIN-SUFFIX,x.ai,美国节点
+DOMAIN-SUFFIX,grok.com,美国节点
+
+# Midjourney
+DOMAIN-SUFFIX,midjourney.com,美国节点
+
+# Meta AI
+DOMAIN-SUFFIX,meta.ai,美国节点
+DOMAIN-SUFFIX,meta.com,美国节点
+
+# Cursor / Dify
+DOMAIN-SUFFIX,cursor.sh,美国节点
+DOMAIN-SUFFIX,dify.ai,美国节点
+
+# Grazie
+DOMAIN-SUFFIX,grazie.ai,美国节点
