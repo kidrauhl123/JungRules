@@ -1,7 +1,7 @@
 policy	file	rules
 direct	direct	5164
 reject	reject	183464
-Proxy	proxy	503
+proxy	proxy	503
 Apple	apple	1877
 Spotify	spotify	30
 国际媒体	media	251
