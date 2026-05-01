@@ -3,7 +3,7 @@
 完整配置，导入后会带上策略组和分流：
 
 ```conf
-https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/profile.conf
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/JungRules.conf
 ```
 
 导入后可以先用内置的临时免费节点测试连通性；如果地区组为空，可以先在 `所有节点` 里手动选择。长期使用建议换成自己的节点订阅。
