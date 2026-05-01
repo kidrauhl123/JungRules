@@ -1,6 +1,6 @@
 # Claude
 
-host-suffix, anthropic.com, 美国节点
-host-suffix, claude.ai, 美国节点
-host-suffix, claude.com, 美国节点
-host-suffix, claudeusercontent.com, 美国节点
+host-suffix, anthropic.com, 美国
+host-suffix, claude.ai, 美国
+host-suffix, claude.com, 美国
+host-suffix, claudeusercontent.com, 美国

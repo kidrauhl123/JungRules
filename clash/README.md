@@ -1,6 +1,6 @@
-# Clash Verge / FlClash
+# Clash / FlClash
 
-推荐优先使用 `by-policy/*.yaml`，兼容性最好。
+推荐使用 `clash/by-policy/*.yaml`，格式是 `classical`。
 
 ```yaml
 rule-providers:
@@ -13,27 +13,23 @@ rule-providers:
     interval: 86400
 
 rules:
-  - RULE-SET,jung_us,美国节点
+  - RULE-SET,jung_us,美国
 ```
 
-文本规则集：
-
-```text
-clash/domain/*.txt   behavior: domain
-clash/ipcidr/*.txt   behavior: ipcidr
-```
-
-示例：
+通用代理规则走 `Proxy`：
 
 ```yaml
 rule-providers:
-  jung_direct:
+  jung_proxy:
     type: http
-    behavior: domain
-    path: ./ruleset/jung_direct.txt
-    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/domain/direct.txt
+    behavior: classical
+    format: yaml
+    path: ./ruleset/jung_proxy.yaml
+    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/by-policy/proxy.yaml
     interval: 86400
 
 rules:
-  - RULE-SET,jung_direct,DIRECT
+  - RULE-SET,jung_proxy,Proxy
 ```
+
+如果想用 Loyalsoldier 那种文本规则集，可以用 `clash/domain/*.txt` 和 `clash/ipcidr/*.txt`。

@@ -1,4 +1,4 @@
 # suno
 
-host-suffix, suno.com, proxy
-host-suffix, api.suno.com, proxy
+host-suffix, suno.com, Proxy
+host-suffix, api.suno.com, Proxy

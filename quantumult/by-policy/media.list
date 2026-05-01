@@ -185,8 +185,8 @@ host-suffix, nflximg.net, 国际媒体
 host-suffix, nflxso.net, 国际媒体
 host-suffix, nflxvideo.net, 国际媒体
 host-keyword, netflixdnstest, 国际媒体
-host-keyword, apiproxy-device-prod-nlb-, 国际媒体
-host-keyword, dualstack.apiproxy-, 国际媒体
+host-keyword, apiProxy-device-prod-nlb-, 国际媒体
+host-keyword, dualstack.apiProxy-, 国际媒体
 user-agent, Niconico*, 国际媒体
 host-suffix, dmc.nico, 国际媒体
 host-suffix, nicovideo.jp, 国际媒体
