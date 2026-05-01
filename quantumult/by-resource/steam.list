@@ -1,0 +1,14 @@
+# steam
+
+host-suffix, steampowered.com, proxy
+host-suffix, steamcommunity.com, proxy
+host-suffix, steam-chat.com, proxy
+host-suffix, steamstatic.com, proxy
+host-suffix, steamcontent.com, direct
+host-suffix, steamserver.net, direct
+host-suffix, aksteamcdn.com, direct
+host-suffix, steamcdn-a.akamaihd.net, direct
+host-suffix, content1.steampowered.com, direct
+host-suffix, content2.steampowered.com, direct
+host-suffix, content3.steampowered.com, direct
+host-suffix, content4.steampowered.com, direct

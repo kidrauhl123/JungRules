@@ -1,0 +1,13 @@
+# 哔哩哔哩
+
+host, api.biliapi.com, 哔哩哔哩
+host, api.biliapi.net, 哔哩哔哩
+host, api.bilibili.com, 哔哩哔哩
+host, app.biliapi.com, 哔哩哔哩
+host, app.biliapi.net, 哔哩哔哩
+host, app.bilibili.com, 哔哩哔哩
+host, grpc.biliapi.net, 哔哩哔哩
+host, m.bilibili.com, 哔哩哔哩
+host, upos-hz-mirrorakam.akamaized.net, 哔哩哔哩
+host, www.bilibili.com, 哔哩哔哩
+host-keyword, cn-hk-eq-bcache-, 哔哩哔哩

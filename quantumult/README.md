@@ -1,17 +1,18 @@
-# Quantumult X Rules
+# Quantumult X 用法
 
-These files include policy names, so they are for Quantumult X.
-
-## Raw URLs
-
-Quantumult X example:
+完整规则：
 
 ```conf
-https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/claude.list, tag=Claude, force-policy=美国节点, update-interval=172800, opt-parser=true, enabled=true
+https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/all.list, tag=自用分流, update-interval=86400, opt-parser=true, enabled=true
 ```
 
-For the full AI bundle:
+按策略拆分：
 
-```conf
-https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/ai-us.list, tag=AI-US, force-policy=美国节点, update-interval=172800, opt-parser=true, enabled=true
+```text
+https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/by-policy/us.list
+https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/by-policy/direct.list
+https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/by-policy/reject.list
+https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/by-policy/global.list
 ```
+
+如果引用按策略拆分的文件，建议在 Quantumult X 里用 `force-policy=` 指定对应策略。

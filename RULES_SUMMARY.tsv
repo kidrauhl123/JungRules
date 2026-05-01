@@ -1,0 +1,10 @@
+policy	file	rules
+美国节点	us	5
+proxy	proxy	10
+direct	direct	5164
+reject	reject	183464
+声田音乐	spotify	30
+国际媒体	media	251
+哔哩哔哩	bilibili	11
+苹果服务	apple	1877
+全球加速	global	493

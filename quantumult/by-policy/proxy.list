@@ -1,0 +1,12 @@
+# proxy
+
+host-suffix, payspo.xyz, proxy
+host-keyword, github, proxy
+host-suffix, ipmars.com, proxy
+host-suffix, iproyal.com, proxy
+host-suffix, suno.com, proxy
+host-suffix, api.suno.com, proxy
+host-suffix, steampowered.com, proxy
+host-suffix, steamcommunity.com, proxy
+host-suffix, steam-chat.com, proxy
+host-suffix, steamstatic.com, proxy
