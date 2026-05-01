@@ -1,35 +1,39 @@
-# Clash / Mihomo 用法
+# Clash Verge / FlClash
 
-这些是 `rule-providers` 用的 classical 规则文件。
+推荐优先使用 `by-policy/*.yaml`，兼容性最好。
 
-classical 格式最兼容；如果想用 MetaCubeX 那种 `behavior: domain` / `behavior: ipcidr` 拆法，看 `../mihomo/`。
+```yaml
+rule-providers:
+  jung_us:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/jung_us.yaml
+    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/by-policy/us.yaml
+    interval: 86400
+
+rules:
+  - RULE-SET,jung_us,美国节点
+```
+
+文本规则集：
+
+```text
+clash/domain/*.txt   behavior: domain
+clash/ipcidr/*.txt   behavior: ipcidr
+```
 
 示例：
 
 ```yaml
 rule-providers:
-  us:
+  jung_direct:
     type: http
-    behavior: classical
-    format: yaml
-    path: ./ruleset/us.yaml
-    url: https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/clash/by-policy/us.yaml
+    behavior: domain
+    path: ./ruleset/jung_direct.txt
+    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/domain/direct.txt
     interval: 86400
 
 rules:
-  - RULE-SET,us,美国节点
-```
-
-可用文件：
-
-```text
-clash/by-policy/us.yaml
-clash/by-policy/proxy.yaml
-clash/by-policy/direct.yaml
-clash/by-policy/reject.yaml
-clash/by-policy/apple.yaml
-clash/by-policy/global.yaml
-clash/by-policy/media.yaml
-clash/by-policy/spotify.yaml
-clash/by-policy/bilibili.yaml
+  - RULE-SET,jung_direct,DIRECT
 ```

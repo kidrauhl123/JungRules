@@ -1,47 +1,69 @@
-# 自用分流规则
+# JungRules
 
-这是从我当前 Quantumult X 规则池导出的分流规则快照。
+自用分流规则，覆盖：
 
-## Quantumult X
+- Windows：Clash Verge / Clash Verge Rev
+- Android：FlClash
+- iOS：Quantumult X
 
-如果你的策略组名字和我一样，可以直接引用完整规则：
+规则来自当前 Quantumult X 规则池导出，并按策略拆分。
 
-```conf
-https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/all.list, tag=自用分流, update-interval=86400, opt-parser=true, enabled=true
-```
+## Clash Verge / FlClash
 
-如果只想引用某一类规则，用 `quantumult/by-policy/` 里的文件，例如：
-
-```conf
-https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/quantumult/by-policy/us.list, tag=美国节点补充, force-policy=美国节点, update-interval=86400, opt-parser=true, enabled=true
-```
-
-## Clash / Mihomo
-
-Clash 规则文件不写策略名，需要在配置里指定走哪个策略组：
+最稳妥的用法：使用 `clash/by-policy/*.yaml`，格式是 `classical`。
 
 ```yaml
 rule-providers:
-  us:
+  jung_us:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/us.yaml
-    url: https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/clash/by-policy/us.yaml
+    path: ./ruleset/jung_us.yaml
+    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/by-policy/us.yaml
     interval: 86400
 
 rules:
-  - RULE-SET,us,美国节点
+  - RULE-SET,jung_us,美国节点
 ```
 
-更多按策略拆分的文件在 `clash/by-policy/`。
+如果想用 Loyalsoldier 那种文本规则集，也可以用：
 
-## Mihomo + MetaCubeX
+```yaml
+rule-providers:
+  jung_us_domain:
+    type: http
+    behavior: domain
+    path: ./ruleset/jung_us_domain.txt
+    url: https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/domain/us.txt
+    interval: 86400
 
-如果想用更标准的 Mihomo 拆法，可以参考：
-
-```text
-mihomo/example-with-metacubex.yaml
+rules:
+  - RULE-SET,jung_us_domain,美国节点
 ```
 
-通用规则直接引用 MetaCubeX，我自己的仓库只做补充规则。
+## Quantumult X
+
+完整规则：
+
+```conf
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/all.list, tag=JungRules, update-interval=86400, opt-parser=true, enabled=true
+```
+
+只引用美国节点补充：
+
+```conf
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/by-policy/us.list, tag=美国节点补充, force-policy=美国节点, update-interval=86400, opt-parser=true, enabled=true
+```
+
+## 文件说明
+
+- `clash/by-policy/`：Clash/FlClash 通用，`behavior: classical`
+- `clash/domain/`：Clash 域名文本规则，`behavior: domain`
+- `clash/ipcidr/`：Clash IP 段文本规则，`behavior: ipcidr`
+- `quantumult/all.list`：QX 完整规则
+- `quantumult/by-policy/`：QX 按策略拆分
+- `quantumult/by-resource/`：QX 按原始资源标签拆分
+
+## 规则数量
+
+见 `RULES_SUMMARY.tsv`。
