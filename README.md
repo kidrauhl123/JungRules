@@ -35,3 +35,13 @@ rules:
 ```
 
 更多按策略拆分的文件在 `clash/by-policy/`。
+
+## Mihomo + MetaCubeX
+
+如果想用更标准的 Mihomo 拆法，可以参考：
+
+```text
+mihomo/example-with-metacubex.yaml
+```
+
+通用规则直接引用 MetaCubeX，我自己的仓库只做补充规则。

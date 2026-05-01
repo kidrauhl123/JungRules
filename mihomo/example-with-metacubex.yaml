@@ -1,0 +1,66 @@
+# 这是示例片段，不是完整配置。
+# 思路：通用大规则用 MetaCubeX，上面叠加自己的补充规则。
+
+rule-providers:
+  # 自己的补充规则
+  my_us:
+    type: http
+    behavior: domain
+    format: yaml
+    path: ./ruleset/my_us.yaml
+    url: https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/mihomo/domain/by-policy/us.yaml
+    interval: 86400
+
+  my_proxy:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/my_proxy.yaml
+    url: https://raw.githubusercontent.com/kidrauhl123/quantumult-rules/main/clash/by-policy/proxy.yaml
+    interval: 86400
+
+  # MetaCubeX 通用规则
+  metacubex_ads:
+    type: http
+    behavior: domain
+    format: yaml
+    path: ./ruleset/metacubex_ads.yaml
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.yaml
+    interval: 86400
+
+  metacubex_cn:
+    type: http
+    behavior: domain
+    format: yaml
+    path: ./ruleset/metacubex_cn.yaml
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.yaml
+    interval: 86400
+
+  metacubex_private:
+    type: http
+    behavior: domain
+    format: yaml
+    path: ./ruleset/metacubex_private.yaml
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.yaml
+    interval: 86400
+
+  metacubex_openai:
+    type: http
+    behavior: domain
+    format: yaml
+    path: ./ruleset/metacubex_openai.yaml
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.yaml
+    interval: 86400
+
+rules:
+  # 个人补充放前面，优先级最高
+  - RULE-SET,my_us,美国节点
+  - RULE-SET,my_proxy,全球加速
+
+  # 通用规则
+  - RULE-SET,metacubex_ads,REJECT
+  - RULE-SET,metacubex_private,DIRECT
+  - RULE-SET,metacubex_openai,美国节点
+  - RULE-SET,metacubex_cn,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,兜底分流

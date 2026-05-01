@@ -2,6 +2,8 @@
 
 这些是 `rule-providers` 用的 classical 规则文件。
 
+classical 格式最兼容；如果想用 MetaCubeX 那种 `behavior: domain` / `behavior: ipcidr` 拆法，看 `../mihomo/`。
+
 示例：
 
 ```yaml
