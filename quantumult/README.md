@@ -1,6 +1,6 @@
 # Quantumult X Rules
 
-Personal Quantumult X rule resources.
+These files include policy names, so they are for Quantumult X.
 
 ## Raw URLs
 
