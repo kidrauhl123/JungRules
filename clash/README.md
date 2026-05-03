@@ -36,10 +36,10 @@ rules:
 
 ## Clash Verge Rev 覆写脚本
 
-如果你已经有节点订阅，推荐直接给订阅添加覆写脚本，这样可以保留原订阅节点，只追加 JungRules 规则：
+如果你已经有节点订阅，推荐直接给订阅添加覆写脚本，这样可以保留原订阅节点，同时用 JungRules 覆盖原订阅里的 `rules`：
 
 ```text
 https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/override/jung-rules.js
 ```
 
-脚本会自动追加 `rule-providers`、常用策略组和 `RULE-SET` 规则。
+脚本会自动追加 `rule-providers` 和常用策略组，并默认把原订阅的 `rules` 替换成 JungRules 的 `RULE-SET` 规则。
