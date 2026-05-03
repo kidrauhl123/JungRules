@@ -33,3 +33,13 @@ rules:
 ```
 
 如果想用 Loyalsoldier 那种文本规则集，可以用 `clash/domain/*.txt` 和 `clash/ipcidr/*.txt`。
+
+## Clash Verge Rev 覆写脚本
+
+如果你已经有节点订阅，推荐直接给订阅添加覆写脚本，这样可以保留原订阅节点，只追加 JungRules 规则：
+
+```text
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/clash/override/jung-rules.js
+```
+
+脚本会自动追加 `rule-providers`、常用策略组和 `RULE-SET` 规则。
