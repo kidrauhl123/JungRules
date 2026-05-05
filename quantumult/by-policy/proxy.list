@@ -4,8 +4,6 @@ host-suffix, payspo.xyz, proxy
 host-keyword, github, proxy
 host-suffix, ipmars.com, proxy
 host-suffix, iproyal.com, proxy
-host-suffix, suno.com, proxy
-host-suffix, api.suno.com, proxy
 host-suffix, steampowered.com, proxy
 host-suffix, steamcommunity.com, proxy
 host-suffix, steam-chat.com, proxy
@@ -45,8 +43,6 @@ host-suffix, cachefly.com, proxy
 host-suffix, cachefly.net, proxy
 host-suffix, castbox.fm, proxy
 host-suffix, change.org, proxy
-host-suffix, chatpdf.com, proxy
-host-suffix, civitai.com, proxy
 host-suffix, cloudcone.com, proxy
 host-suffix, clyp.it, proxy
 host-suffix, cna.com.tw, proxy
@@ -54,7 +50,6 @@ host-suffix, comparitech.com, proxy
 host-suffix, conoha.jp, proxy
 host-suffix, coursehero.com, proxy
 host-suffix, c-span.org, proxy
-host-suffix, cutout.pro, proxy
 host-suffix, dailymotion.com, proxy
 host-suffix, dashlane.com, proxy
 host-suffix, daum.net, proxy
@@ -62,8 +57,6 @@ host-suffix, deadline.com, proxy
 host-suffix, depositphotos.com, proxy
 host-suffix, deviantart.com, proxy
 host-suffix, deviantart.net, proxy
-host-suffix, devv.ai, proxy
-host-suffix, dify.ai, proxy
 host-suffix, disconnect.me, proxy
 host-suffix, disqus.com, proxy
 host-suffix, dlive.tv, proxy
@@ -84,14 +77,12 @@ host-suffix, flitto.com, proxy
 host-suffix, forbes.com, proxy
 host-suffix, foreignaffairs.com, proxy
 host-suffix, foreignpolicy.com, proxy
-host-suffix, generated.photos, proxy
 host-suffix, genius.com, proxy
 host-suffix, getsync.com, proxy
 host-suffix, gfw.report, proxy
 host-suffix, git.io, proxy
 host-suffix, githack.com, proxy
 host-suffix, gitlab.com, proxy
-host-suffix, glarity.app, proxy
 host-suffix, godaddy.com, proxy
 host-suffix, goodreads.com, proxy
 host-suffix, graphql.org, proxy
@@ -103,7 +94,6 @@ host-suffix, herokuapp.com, proxy
 host-suffix, hiccears.com, proxy
 host-suffix, hket.com, proxy
 host-suffix, huffpost.com, proxy
-host-suffix, huggingface.co, proxy
 host-suffix, i-cable.com, proxy
 host-suffix, imageglass.org, proxy
 host-suffix, imgur.com, proxy
@@ -130,7 +120,6 @@ host-suffix, mega.nz, proxy
 host-suffix, metamask.io, proxy
 host-suffix, mixlr.com, proxy
 host-suffix, mod.io, proxy
-host-suffix, monica.im, proxy
 host-suffix, moon.fm, proxy
 host-suffix, mubi.com, proxy
 host-suffix, myspace.com, proxy
@@ -154,12 +143,9 @@ host-suffix, pastie.org, proxy
 host-suffix, patreon.com, proxy
 host-suffix, pcloud.com, proxy
 host-suffix, peing.net, proxy
-host-suffix, perplexity.ai, proxy
 host-suffix, player.fm, proxy
 host-suffix, pocketcasts.com, proxy
 host-suffix, podbean.com, proxy
-host-suffix, podwise.ai, proxy
-host-suffix, poe.com, proxy
 host-suffix, prism-break.org, proxy
 host-suffix, privoxy.org, proxy
 host-suffix, proton.me, proxy
@@ -238,11 +224,9 @@ host-suffix, wire.com, proxy
 host-suffix, wireguard.com, proxy
 host-suffix, wn.com, proxy
 host-suffix, worldcat.org, proxy
-host-suffix, writesonic.com, proxy
 host-suffix, wsj.com, proxy
 host-suffix, wsj.net, proxy
 host-suffix, x.co, proxy
-host-suffix, you.com, proxy
 host-suffix, you-get.org, proxy
 host-suffix, zaobao.com, proxy
 host-suffix, zello.com, proxy
@@ -312,7 +296,6 @@ host-suffix, fbworkmail.com, proxy
 host-suffix, instagram.com, proxy
 host-suffix, m.me, proxy
 host-suffix, messenger.com, proxy
-host-suffix, meta.ai, proxy
 host-suffix, meta.com, proxy
 host-suffix, oculus.com, proxy
 host-suffix, oculuscdn.com, proxy
@@ -336,8 +319,6 @@ host, assets2.xboxlive.com, proxy
 host, az416426.vo.msecnd.net, proxy
 host, az668014.vo.msecnd.net, proxy
 host, github.global.ssl.fastly.net, proxy
-host-suffix, chatgpt.com, proxy
-host-suffix, openai.com, proxy
 host-suffix, pinimg.com, proxy
 host-keyword, .pinterest., proxy
 host-suffix, pixiv.net, proxy
@@ -405,7 +386,6 @@ host-suffix, wikisource.org, proxy
 host-suffix, wikiversity.org, proxy
 host-suffix, wikivoyage.org, proxy
 host-suffix, wiktionary.org, proxy
-host-suffix, grok.com, proxy
 host-suffix, periscope.tv, proxy
 host-suffix, pscp.tv, proxy
 host-suffix, t.co, proxy
@@ -416,7 +396,6 @@ host-suffix, twitpic.com, proxy
 host-suffix, twitter.com, proxy
 host-suffix, twitter.jp, proxy
 host-suffix, vine.co, proxy
-host-suffix, x.ai, proxy
 host-suffix, x.com, proxy
 host-suffix, yahoo.com, proxy
 host-suffix, yimg.com, proxy
@@ -462,4 +441,3 @@ host-suffix, bing.com, proxy
 host-suffix, linkedin.com, proxy
 host-suffix, licdn.com, proxy
 host-suffix, msn.com, proxy
-host, copilot.microsoft.com, proxy
