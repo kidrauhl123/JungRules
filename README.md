@@ -23,7 +23,7 @@ https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/JungRule
 只想额外引用某个规则资源时，可以使用 `.list` 文件，例如：
 
 ```conf
-https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/by-policy/us.list, tag=美国补充, force-policy=美国, update-interval=86400, opt-parser=true, enabled=true
+https://raw.githubusercontent.com/kidrauhl123/JungRules/main/quantumult/by-policy/ai.list, tag=AI, force-policy=AI, update-interval=86400, opt-parser=true, enabled=true
 ```
 
 ## Clash Verge / FlClash
