@@ -1,0 +1,33 @@
+# Microsoft
+
+host-suffix, microsoft.com, 微软
+host-suffix, microsoftonline.com, 微软
+host-suffix, microsoftusercontent.com, 微软
+host-suffix, microsoft365.com, 微软
+host-suffix, office.com, 微软
+host-suffix, office.net, 微软
+host-suffix, office365.com, 微软
+host-suffix, live.com, 微软
+host-suffix, live.net, 微软
+host-suffix, outlook.com, 微软
+host-suffix, onedrive.com, 微软
+host-suffix, sharepoint.com, 微软
+host-suffix, skype.com, 微软
+host-suffix, bing.com, 微软
+host-suffix, msn.com, 微软
+host-suffix, msftauth.net, 微软
+host-suffix, msauth.net, 微软
+host-suffix, msftauthimages.net, 微软
+host-suffix, msftidentity.com, 微软
+host-suffix, windows.com, 微软
+host-suffix, windows.net, 微软
+host-suffix, windowsupdate.com, 微软
+host-suffix, xbox.com, 微软
+host-suffix, xboxlive.com, 微软
+host-suffix, azure.com, 微软
+host-suffix, azure.net, 微软
+host-suffix, azureedge.net, 微软
+host-suffix, azurefd.net, 微软
+host-suffix, visualstudio.com, 微软
+host-suffix, vscode.dev, 微软
+host, copilot.microsoft.com, 微软
