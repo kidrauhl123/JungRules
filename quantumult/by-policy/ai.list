@@ -1,5 +1,12 @@
 # AI
 
+host, claude.ai, AI
+host, a.claude.ai, AI
+host, api.anthropic.com, AI
+host, a-api.anthropic.com, AI
+host, a-cdn.anthropic.com, AI
+host, s-cdn.anthropic.com, AI
+host, assets-proxy.anthropic.com, AI
 host-suffix, anthropic.com, AI
 host-suffix, claude.ai, AI
 host-suffix, claude.com, AI
