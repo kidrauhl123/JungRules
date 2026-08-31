@@ -85,6 +85,8 @@ host, edge.apple, Apple
 host, experiments.apple.com, Apple
 host, fides-pol.apple.com, Apple
 host, gateway.icloud.com, Apple
+host, cu-cn-north00001.gala.convection.cn, Apple
+host, cu-cn-north00002.gala.convection.cn, Apple
 host, gs-loc-cn.apple.com, Apple
 host, gs-loc.apple.com, Apple
 host, gsp10-ssl-cn.ls.apple.com, Apple
