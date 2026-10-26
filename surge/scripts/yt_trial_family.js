@@ -1,33 +1,27 @@
 /**
- * Surge http-response 脚本 —— YouTube Premium 强开试用（个人 + 家庭组）
+ * Surge http-response 脚本 —— YouTube Premium 整页接管（个人 + 家庭组）
  *
- * 原理：Google 下发的 productId 带 _NFT（Non-Free-Trial，无试用商品）。
- *      替换成 App Store 里真实存在的「带 intro offer」商品，StoreKit 就会
- *      按该商品的试用资格弹「免费试用」确认框。
+ * 三层改写：
+ *   A. productId（结构化重写，长度自适应）
+ *        com.google.youtube.red.subscription_NFT -> family.red.subscription
+ *        com.google.youtube.premiumLite..._NFT   -> 去掉 _NFT
+ *   B. 档位标签（同长度字节替换，零风险）
+ *        "Premium" -> "Family!"   (7 -> 7)
+ *   C. 价格文案（同长度字节替换）
+ *        "US$20.99" -> "US$34.99" (8 -> 8)  家庭组定价
  *
- * 替换策略（与官方试用态响应结构一致：个人/家庭交替成对出现）：
- *   第 1、3、5… 个 personal -> com.google.youtube.red.subscription        （个人试用）
- *   第 2、4、6… 个 personal -> com.google.youtube.family.red.subscription （家庭组试用）
- *
- * MODE:
- *   "both"     -> 交替（推荐，个人+家庭都有）
- *   "personal" -> 全部个人
- *   "family"   -> 全部家庭
- *
- * [Script]
- * yt-force-trial = type=http-response, pattern=^https://youtubei\.googleapis\.com/youtubei/v1/browse, requires-body=1, max-size=0, binary-body-mode=1, script-path=<URL>
+ * MODE: "family" | "personal"
  */
 (function () {
   var MODE = "family";
-  var TAG = "[force-trial:" + MODE + "]";
+  var TAG = "[yt-full:" + MODE + "]";
 
-  var SRC_PERSONAL = "com.google.youtube.red.subscription_NFT";
-  var SRC_LITE     = "com.google.youtube.premiumLite.subscriptionLiteGroup_NFT";
-  var DST_PERSONAL = "com.google.youtube.red.subscription";
-  var DST_FAMILY   = "com.google.youtube.family.red.subscription";
-  var DST_LITE     = "com.google.youtube.premiumLite.subscriptionLiteGroup";
+  var SRC_P = "com.google.youtube.red.subscription_NFT";
+  var SRC_L = "com.google.youtube.premiumLite.subscriptionLiteGroup_NFT";
+  var DST_P = "com.google.youtube.red.subscription";
+  var DST_F = "com.google.youtube.family.red.subscription";
+  var DST_L = "com.google.youtube.premiumLite.subscriptionLiteGroup";
 
-  // ---------- protobuf ----------
   function readVarint(b, i) {
     var r = 0, s = 0, x;
     do { x = b[i++]; r += (x & 0x7f) * Math.pow(2, s); s += 7; } while (x & 0x80);
@@ -35,10 +29,7 @@
   }
   function writeVarint(n) {
     var o = [];
-    while (true) {
-      var b = n & 0x7f; n = Math.floor(n / 128);
-      if (n > 0) o.push(b | 0x80); else { o.push(b); break; }
-    }
+    while (true) { var b = n & 0x7f; n = Math.floor(n / 128); if (n > 0) o.push(b | 0x80); else { o.push(b); break; } }
     return o;
   }
   function parseFields(b, start, end) {
@@ -74,74 +65,88 @@
   }
   function toStr(u8) {
     var s = "", CH = 8192;
-    for (var i = 0; i < u8.length; i += CH) {
-      s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CH, u8.length)));
-    }
+    for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CH, u8.length)));
     return s;
   }
-  function strToBytes(str) {
+  function s2b(str) {
     var a = new Uint8Array(str.length);
     for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 0xff;
     return a;
   }
-  function looksLikeMsg(b) {
+  function looksMsg(b) {
     if (!b || b.length < 2) return false;
     try { return parseFields(b, 0, b.length).length > 0; } catch (e) { return false; }
   }
 
-  // ---------- 改写 ----------
-  var seenPersonal = 0, seenLite = 0, outLog = [];
+  var nP = 0, nL = 0;
 
-  function pickPersonal() {
-    if (MODE === "personal") return DST_PERSONAL;
-    if (MODE === "family")   return DST_FAMILY;
-    // both: 交替（1,3,5.. -> personal；2,4,6.. -> family）
-    seenPersonal++;
-    return (seenPersonal % 2 === 1) ? DST_PERSONAL : DST_FAMILY;
-  }
-
-  function transform(buf) {
+  // A. productId 结构化重写
+  function rewritePid(buf) {
     var fields;
     try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var changed = false, outFields = [];
+    var changed = false, outF = [];
     for (var i = 0; i < fields.length; i++) {
       var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (wt === 2 && v.length > 20 && v.length < 120) {
+      if (wt === 2 && v.length > 18 && v.length < 120) {
         var t = toStr(v);
-        if (t === SRC_PERSONAL) {
-          var rep = pickPersonal();
-          outFields.push([fn, 2, strToBytes(rep)]);
-          outLog.push(rep.replace("com.google.youtube.", ""));
-          changed = true; continue;
-        }
-        if (t === SRC_LITE) {
-          outFields.push([fn, 2, strToBytes(DST_LITE)]);
-          seenLite++;
-          changed = true; continue;
-        }
+        if (t === SRC_P) { outF.push([fn, 2, s2b(MODE === "family" ? DST_F : DST_P)]); nP++; changed = true; continue; }
+        if (t === SRC_L) { outF.push([fn, 2, s2b(DST_L)]); nL++; changed = true; continue; }
       }
-      if (wt === 2 && v.length > 2 && looksLikeMsg(v)) {
-        var sub = transform(v);
-        if (sub) { outFields.push([fn, 2, sub]); changed = true; continue; }
+      if (wt === 2 && v.length > 2 && looksMsg(v)) {
+        var sub = rewritePid(v);
+        if (sub) { outF.push([fn, 2, sub]); changed = true; continue; }
       }
-      outFields.push([fn, wt, v]);
+      outF.push([fn, wt, v]);
     }
-    return changed ? serialize(outFields) : null;
+    return changed ? serialize(outF) : null;
+  }
+
+  // B/C. 同长度字节替换
+  function sameLenReplace(u8, from, to, requirePrefix) {
+    if (from.length !== to.length) return { out: u8, n: 0 };
+    var n = 0, out = new Uint8Array(u8);
+    for (var i = 0; i + from.length <= u8.length; i++) {
+      var ok = true;
+      for (var j = 0; j < from.length; j++) { if (u8[i + j] !== from[j]) { ok = false; break; } }
+      if (!ok) continue;
+      // 可选前缀校验：只有紧跟在指定字节序列后才替换（用于定位 protobuf 字段）
+      if (requirePrefix) {
+        var p = requirePrefix, fit = (i >= p.length);
+        if (fit) {
+          for (var q = 0; q < p.length; q++) {
+            if (u8[i - p.length + q] !== p[q]) { fit = false; break; }
+          }
+        }
+        if (!fit) continue;
+      }
+      for (var k = 0; k < to.length; k++) out[i + k] = to[k];
+      n++; i += from.length - 1;
+    }
+    return { out: out, n: n };
   }
 
   var body = $response.body;
   if (!body || typeof body.length !== "number") { $done({}); return; }
-
   var probe = toStr(body);
-  if (probe.indexOf("com.google.youtube.") < 0) {
-    console.log(TAG + " skip (no productId)");
-    $done({}); return;
+  if (probe.indexOf("com.google.youtube.") < 0) { console.log(TAG + " skip"); $done({}); return; }
+
+  // A
+  var r1 = rewritePid(body);
+  var cur = r1 ? new Uint8Array(r1) : body;
+
+  // B/C
+  var nLabel = 0, nPrice = 0;
+  if (MODE === "family") {
+    // 只替换档位标签: field1 len7 "Premium" -> field1 len7 "Family!"
+    var rb = sameLenReplace(cur, s2b("Premium"), s2b("Family!"), s2b("\x0a\x07"));
+    cur = rb.out; nLabel = rb.n;
+    var rp = sameLenReplace(cur, s2b("US$20.99"), s2b("US$34.99"));
+    cur = rp.out; nPrice = rp.n;
   }
 
-  var res = transform(body);
-  if (!res || !outLog.length) { console.log(TAG + " nothing patched"); $done({}); return; }
+  if (!nP && !nL) { console.log(TAG + " nothing"); $done({}); return; }
 
-  console.log(TAG + " " + body.length + "->" + res.length + "B  personal=" + seenPersonal +
-              " lite=" + seenLite + "  [" + outLog.join(", ") + "]");
-  $done({ body: new Uint8Array(res) });
+  console.log(TAG + " " + body.length + "->" + cur.length + "B pid=" + nP + "/" + nL +
+              " label=" + nLabel + " price=" + nPrice);
+  $done({ body: cur });
 })();
