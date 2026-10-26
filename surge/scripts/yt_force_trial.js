@@ -1,31 +1,31 @@
 /**
- * Surge http-response 脚本 —— YouTube Premium 强开试用 / 家庭组
+ * Surge http-response 脚本 —— YouTube Premium 强开试用（个人 + 家庭组）
  *
- * 原理：Google 下发的 productId 带 _NFT 后缀（Non-Free-Trial 商品，无试用）。
- *      把 productId 替换成 App Store 里真实存在的「带 intro offer」商品，
- *      StoreKit 就会按该商品的试用资格弹「免费试用」确认框。
+ * 原理：Google 下发的 productId 带 _NFT（Non-Free-Trial，无试用商品）。
+ *      替换成 App Store 里真实存在的「带 intro offer」商品，StoreKit 就会
+ *      按该商品的试用资格弹「免费试用」确认框。
  *
- * 两种模式（改 MODE 即可）：
- *   'personal' -> com.google.youtube.red.subscription          个人试用
- *   'family'   -> com.google.youtube.family.red.subscription   家庭组试用
+ * 替换策略（与官方试用态响应结构一致：个人/家庭交替成对出现）：
+ *   第 1、3、5… 个 personal -> com.google.youtube.red.subscription        （个人试用）
+ *   第 2、4、6… 个 personal -> com.google.youtube.family.red.subscription （家庭组试用）
+ *
+ * MODE:
+ *   "both"     -> 交替（推荐，个人+家庭都有）
+ *   "personal" -> 全部个人
+ *   "family"   -> 全部家庭
  *
  * [Script]
  * yt-force-trial = type=http-response, pattern=^https://youtubei\.googleapis\.com/youtubei/v1/browse, requires-body=1, max-size=0, binary-body-mode=1, script-path=<URL>
  */
 (function () {
-  var MODE = "family";        // <<< 改这里: "personal" | "family"
+  var MODE = "both";
   var TAG = "[force-trial:" + MODE + "]";
 
-  var MAP = {
-    "com.google.youtube.red.subscription_NFT": {
-      personal: "com.google.youtube.red.subscription",
-      family:   "com.google.youtube.family.red.subscription"
-    },
-    "com.google.youtube.premiumLite.subscriptionLiteGroup_NFT": {
-      personal: "com.google.youtube.premiumLite.subscriptionLiteGroup",
-      family:   "com.google.youtube.premiumLite.subscriptionLiteGroup"
-    }
-  };
+  var SRC_PERSONAL = "com.google.youtube.red.subscription_NFT";
+  var SRC_LITE     = "com.google.youtube.premiumLite.subscriptionLiteGroup_NFT";
+  var DST_PERSONAL = "com.google.youtube.red.subscription";
+  var DST_FAMILY   = "com.google.youtube.family.red.subscription";
+  var DST_LITE     = "com.google.youtube.premiumLite.subscriptionLiteGroup";
 
   // ---------- protobuf ----------
   function readVarint(b, i) {
@@ -79,13 +79,26 @@
     }
     return s;
   }
+  function strToBytes(str) {
+    var a = new Uint8Array(str.length);
+    for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 0xff;
+    return a;
+  }
   function looksLikeMsg(b) {
     if (!b || b.length < 2) return false;
     try { return parseFields(b, 0, b.length).length > 0; } catch (e) { return false; }
   }
 
   // ---------- 改写 ----------
-  var patched = 0;
+  var seenPersonal = 0, seenLite = 0, outLog = [];
+
+  function pickPersonal() {
+    if (MODE === "personal") return DST_PERSONAL;
+    if (MODE === "family")   return DST_FAMILY;
+    // both: 交替（1,3,5.. -> personal；2,4,6.. -> family）
+    seenPersonal++;
+    return (seenPersonal % 2 === 1) ? DST_PERSONAL : DST_FAMILY;
+  }
 
   function transform(buf) {
     var fields;
@@ -95,13 +108,16 @@
       var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
       if (wt === 2 && v.length > 20 && v.length < 120) {
         var t = toStr(v);
-        if (MAP.hasOwnProperty(t)) {
-          var rep = MAP[t][MODE];
-          var nb = [];
-          for (var z = 0; z < rep.length; z++) nb.push(rep.charCodeAt(z) & 0xff);
-          outFields.push([fn, 2, new Uint8Array(nb)]);
-          patched++; changed = true;
-          continue;
+        if (t === SRC_PERSONAL) {
+          var rep = pickPersonal();
+          outFields.push([fn, 2, strToBytes(rep)]);
+          outLog.push(rep.replace("com.google.youtube.", ""));
+          changed = true; continue;
+        }
+        if (t === SRC_LITE) {
+          outFields.push([fn, 2, strToBytes(DST_LITE)]);
+          seenLite++;
+          changed = true; continue;
         }
       }
       if (wt === 2 && v.length > 2 && looksLikeMsg(v)) {
@@ -116,17 +132,16 @@
   var body = $response.body;
   if (!body || typeof body.length !== "number") { $done({}); return; }
 
-  // 全量探测（productId 可能出现在任意偏移）
   var probe = toStr(body);
   if (probe.indexOf("com.google.youtube.") < 0) {
-    console.log(TAG + " skip (no youtube productId)");
+    console.log(TAG + " skip (no productId)");
     $done({}); return;
   }
 
   var res = transform(body);
-  if (!res || !patched) { console.log(TAG + " nothing patched"); $done({}); return; }
+  if (!res || !outLog.length) { console.log(TAG + " nothing patched"); $done({}); return; }
 
-  console.log(TAG + " patched " + patched + " -> " + MAP["com.google.youtube.red.subscription_NFT"][MODE] +
-              "  (" + body.length + " -> " + res.length + "B)");
+  console.log(TAG + " " + body.length + "->" + res.length + "B  personal=" + seenPersonal +
+              " lite=" + seenLite + "  [" + outLog.join(", ") + "]");
   $done({ body: new Uint8Array(res) });
 })();
