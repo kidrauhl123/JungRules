@@ -1,5 +1,5 @@
 /**
- * yt_trial —— YouTube Premium 试用页统一处理（Surge http-response）
+ * yt_trial.js —— YouTube Premium 试用页统一处理（Surge http-response）
  *
  * 目标：任何账号打开 Premium 页，都至少有一个可点的方案按钮。
  *
