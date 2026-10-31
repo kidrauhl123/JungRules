@@ -102,6 +102,9 @@
             if(gf[q][0]===1){ gch=true; continue; }
             var qv=gf[q][2];
             if(gf[q][0]===2 && gf[q][1]===2 && qv.length>100){
+              // 跳过 Lite 卡（不需要）
+              var qs=ts(qv);
+              if(qs.indexOf("premiumLite")>=0 || qs.indexOf("87H1Y")>=0){ gch=true; continue; }
               var sub2=walk(qv,2);
               if(sub2){ go.push([2,2,sub2]); gch=true; continue; }
             }
