@@ -47,6 +47,7 @@
         for(var j=0;j<inner.length;j++){
           var f2=inner[j][0],w2=inner[j][1],v2=inner[j][2];
           if(f2===5 && w2===2) io.push([5,2,tb(label)]);
+          else if(f2===11 && w2===0) io.push([11,0,1]);   // 统一为深蓝主按钮样式
           else if(f2===19 && w2===2){
             var sf; try{sf=parse(v2,0,v2.length);}catch(e){io.push([f2,w2,v2]);continue;}
             var so=[];
