@@ -1,26 +1,27 @@
 /**
  * yt_trial.js —— YouTube Premium 极简页（Surge http-response）
  *
- * 目标：所有账号打开 Premium 页，都只剩方案按钮，没有营销/FAQ/轮播。
+ * 目标：不管什么账号、原页面是什么样，Premium 页一律换成我们自己的极简页
+ *       ——只有方案按钮（Individual / Family / Premium Lite），没有任何
+ *       营销、FAQ、评价、轮播。
  *
- * 为什么不再整页套模板：
- *   旧版把整页换成一份冻结的旧模板，里面冻着
- *   lp2_option_selection_flow_step|57e2e2c3…，线上早已是 6867b0a3…，
- *   于是好页面被换坏 -> 白屏；按钮还缺购买令牌 -> 点了没反应。
- *
- * 本版做法（抗更新的关键）：
- *   1. 运行时从“同一个响应”里把方案卡 section 原样抽出来
- *      （判据：含 id.ypc.offer.button 且有 unlimited.*.P.* 商品号）；
- *   2. sectionList.contents 只留这一块，其余营销内容全丢；
- *   3. 抽出来的是服务端当版字节，渲染器哈希天然是当前的，不会过期。
- *
- * 页面里没有方案卡时（无资格页），才用内置块兜底（同源真实数据）。
+ * 做法：
+ *   1. 不再区分“页面有没有方案卡”，一律用内置方案卡块替换 sectionList；
+ *   2. 内置块是冻结数据，但里面的渲染器/主题/能力标识符
+ *      （lp_section_group.eml-js-fe|<hash>、theme|<hash>、capabilities|<hash>）
+ *      每次运行都从“当前响应”里读出真实值替换进去 —— 内容固定，
+ *      渲染器永远跟服务端当版一致，App 升级不会因为哈希变化而白屏；
+ *   3. 只在确认是 Premium 页（含 premium_page_section_list）时动手，
+ *      其它 browse 请求（首页/订阅/搜索）原样放行。
  *
  * 内置块来源：iOS 21.42.4 真实响应 sectionList.contents[1]
- *   Individual unlimited.P.AAAABP9AbpQ / Family unlimited.P.AAAABP9Abps
- *   Premium Lite unlimited-B-ruby.P.AAAABP87H1Y
- *   渲染器 lp_section_group.eml-js-fe|4f74332729180f54（跨版本未变）
- *   无会话令牌，roundtrip 无损
+ *   Individual unlimited.P.AAAABP9AbpQ ($20.99/mo, 试用1个月$0)
+ *   Family     unlimited.P.AAAABP9Abps ($34.99/mo, 试用1个月$0)
+ *   Lite       unlimited-B-ruby.P.AAAABP87H1Y ($11.99/mo)
+ *   无会话令牌，protobuf roundtrip 无损。
+ *
+ * 说明：按钮点击走的是响应里自带的 ypc_transaction 命令，最终是否弹出
+ *       Apple 购买框由账号资格与 App Store 登录状态决定。
  *
  * [Script]
  * yt-trial = type=http-response, pattern=^https://youtubei\.googleapis\.com/youtubei/v1/browse, requires-body=1, max-size=0, binary-body-mode=1, script-path=<URL>
@@ -28,7 +29,7 @@
 (function () {
   var TAG = "[yt-trial]";
 
-  // 无资格页兜底块（真实数据，纯 model，不含会话令牌）
+  // 内置美区方案卡块（冻结数据，运行时按当前响应校准标识符）
   var OFFER_B64 =
     "ssC9vwGUJQrbJJLJzskE1CQqHAhQELsvGAEiEwip5t+9xOOXAxVwkuUHHez+D3m6+9KSBa8kCuIjyuvqgwXbIxozksuhkAUt" +
     "CitscF9zZWN0aW9uX2dyb3VwLmVtbC1qcy1mZXw0Zjc0MzMyNzI5MTgwZjU0KsohyqmiqQzDIQrSGPLG+oMOyxgKqg2Kyvav" +
@@ -176,63 +177,73 @@
     return false;
   }
 
+  // 从整包响应里收集所有 "<name>|<16位hex>" 标识符，按名字建表
+  function collectIds(bodyStr) {
+    var table = {};
+    var re = /([a-z0-9_]+\.eml-(?:js-)?fe|theme|capabilities)\|([0-9a-f]{16})/g;
+    var m;
+    while ((m = re.exec(bodyStr)) !== null) {
+      if (!table[m[1]]) table[m[1]] = m[2];
+    }
+    return table;
+  }
+
+  // 用当前响应的标识符校准内置块：只替换 hash，保持块结构不变
+  function calibrate(blockStr, ids) {
+    var changed = [];
+    var re = /([a-z0-9_]+\.eml-(?:js-)?fe|theme|capabilities)\|([0-9a-f]{16})/g;
+    var out = blockStr.replace(re, function (all, name, oldHash) {
+      if (ids[name] && ids[name] !== oldHash) {
+        changed.push(name + ":" + oldHash + "->" + ids[name]);
+        return name + "|" + ids[name];
+      }
+      return all;
+    });
+    return { text: out, changed: changed };
+  }
+
   // sectionListRenderer 在 iOS browse 响应里的固定路径
   var SL_PATH = [58173949, 1, 58174010, 4, 49399797];
 
-  // 判断一个 section 是否是“方案卡”：带按钮 + 带真实商品号，且体积不大
-  function isOfferSection(v) {
-    if (!v || v.length < 300 || v.length > 9000) return false;
-    if (!contains(v, "id.ypc.offer.button")) return false;
-    var s = toStr(v);
-    return s.indexOf("unlimited.P.") >= 0 || s.indexOf("unlimited-B-") >= 0;
-  }
-
-  // 只保留方案卡 section，其余全删；若一个都没有则用内置块兜底
-  function slimSectionList(buf) {
+  // 把 sectionList 的 contents 整个换成内置块（保留 targetId 等其它字段）
+  function replaceSectionList(buf, block) {
     var fields;
     try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var contents = [], others = [];
+    var out = [], placed = false;
     for (var i = 0; i < fields.length; i++) {
       var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (fn === 1 && wt === 2) contents.push(v);
-      else others.push([fn, wt, v]);
-    }
-    var kept = [];
-    for (var j = 0; j < contents.length; j++) if (isOfferSection(contents[j])) kept.push(contents[j]);
-    var source = "live";
-    if (!kept.length) { kept = [b64decode(OFFER_B64)]; source = "builtin"; }
-
-    var out = [];
-    for (var k = 0; k < kept.length; k++) out.push([1, 2, kept[k]]);
-    for (var m = 0; m < others.length; m++) out.push(others[m]);
-    return { bytes: serialize(out), source: source, kept: kept.length, dropped: contents.length - kept.length };
-  }
-
-  // 沿固定路径下钻，把 sectionList 替换成精简版
-  function descend(buf, depth) {
-    var fields;
-    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    if (depth >= SL_PATH.length) {
-      var r = slimSectionList(buf);
-      return r ? { bytes: r.bytes, info: r } : null;
-    }
-    var target = SL_PATH[depth], out = [], done = false, info = null;
-    for (var i = 0; i < fields.length; i++) {
-      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (fn === target && wt === 2 && !done) {
-        var sub = descend(v, depth + 1);
-        if (sub) { out.push([fn, 2, sub.bytes]); done = true; info = sub.info; continue; }
+      if (fn === 1 && wt === 2) {
+        if (!placed) { out.push([1, 2, block]); placed = true; }
+        continue;                                  // 其余旧 section 全丢
       }
       out.push([fn, wt, v]);
     }
-    return done ? { bytes: serialize(out), info: info } : null;
+    if (!placed) out.unshift([1, 2, block]);
+    return serialize(out);
+  }
+
+  function descend(buf, depth, block) {
+    var fields;
+    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
+    if (depth >= SL_PATH.length) return replaceSectionList(buf, block);
+    var target = SL_PATH[depth], out = [], done = false;
+    for (var i = 0; i < fields.length; i++) {
+      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
+      if (fn === target && wt === 2 && !done) {
+        var sub = descend(v, depth + 1, block);
+        if (sub) { out.push([fn, 2, sub]); done = true; continue; }
+      }
+      out.push([fn, wt, v]);
+    }
+    return done ? serialize(out) : null;
   }
 
   // ---------------- 主流程 ----------------
   var body = $response.body;
   if (!body || typeof body.length !== "number") { $done({}); return; }
 
-  if (!contains(body, "premium_page_section_list")) { $done({}); return; }  // 非 Premium 页放行
+  var bodyStr = toStr(body);
+  if (bodyStr.indexOf("premium_page_section_list") < 0) { $done({}); return; }  // 非 Premium 页放行
 
   var top;
   try { top = parseFields(body, 0, body.length); } catch (e) { console.log(TAG + " parse fail"); $done({}); return; }
@@ -241,16 +252,27 @@
   for (var i = 0; i < top.length; i++) if (top[i][0] === 9 && top[i][1] === 2) f9 = top[i][2];
   if (!f9) { console.log(TAG + " no field9"); $done({}); return; }
 
-  var res = descend(f9, 0);
-  if (!res) { console.log(TAG + " sectionList not found -> pass"); $done({}); return; }
+  // 校准内置块：以 field777（渲染器注册表，标识符最全）为主，field9 兜底
+  var ids = {};
+  var reg = null;
+  for (var r = 0; r < top.length; r++) if (top[r][0] === 777 && top[r][1] === 2) reg = top[r][2];
+  if (reg) ids = collectIds(toStr(reg));
+  var pageIds = collectIds(bodyStr);
+  for (var key in pageIds) if (!ids[key]) ids[key] = pageIds[key];
+  var blockStr = toStr(b64decode(OFFER_B64));
+  var cal = calibrate(blockStr, ids);
+  var block = strToBytes(cal.text);
+
+  var newF9 = descend(f9, 0, block);
+  if (!newF9) { console.log(TAG + " sectionList not found -> pass"); $done({}); return; }
 
   var out = [], hit = false;
   for (var k = 0; k < top.length; k++) {
-    if (top[k][0] === 9 && top[k][1] === 2 && !hit) { out.push([9, 2, res.bytes]); hit = true; }
+    if (top[k][0] === 9 && top[k][1] === 2 && !hit) { out.push([9, 2, newF9]); hit = true; }
     else out.push([top[k][0], top[k][1], top[k][2]]);
   }
   var final = new Uint8Array(serialize(out));
-  console.log(TAG + " slim: " + res.info.source + " kept=" + res.info.kept +
-              " dropped=" + res.info.dropped + "  " + body.length + " -> " + final.length + "B");
+  console.log(TAG + " builtin-only " + body.length + " -> " + final.length + "B" +
+              (cal.changed.length ? "  recalibrated[" + cal.changed.join(", ") + "]" : "  ids-ok"));
   $done({ body: final });
 })();
