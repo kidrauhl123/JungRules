@@ -1,278 +1,207 @@
-/**
- * yt_trial.js —— YouTube Premium 极简页（Surge http-response）
- *
- * 目标：不管什么账号、原页面是什么样，Premium 页一律换成我们自己的极简页
- *       ——只有方案按钮（Individual / Family / Premium Lite），没有任何
- *       营销、FAQ、评价、轮播。
- *
- * 做法：
- *   1. 不再区分“页面有没有方案卡”，一律用内置方案卡块替换 sectionList；
- *   2. 内置块是冻结数据，但里面的渲染器/主题/能力标识符
- *      （lp_section_group.eml-js-fe|<hash>、theme|<hash>、capabilities|<hash>）
- *      每次运行都从“当前响应”里读出真实值替换进去 —— 内容固定，
- *      渲染器永远跟服务端当版一致，App 升级不会因为哈希变化而白屏；
- *   3. 只在确认是 Premium 页（含 premium_page_section_list）时动手，
- *      其它 browse 请求（首页/订阅/搜索）原样放行。
- *
- * 内置块来源：iOS 21.42.4 真实响应 sectionList.contents[1]
- *   Individual unlimited.P.AAAABP9AbpQ ($20.99/mo, 试用1个月$0)
- *   Family     unlimited.P.AAAABP9Abps ($34.99/mo, 试用1个月$0)
- *   Lite       unlimited-B-ruby.P.AAAABP87H1Y ($11.99/mo)
- *   无会话令牌，protobuf roundtrip 无损。
- *
- * 说明：按钮点击走的是响应里自带的 ypc_transaction 命令，最终是否弹出
- *       Apple 购买框由账号资格与 App Store 登录状态决定。
- *
- * [Script]
- * yt-trial = type=http-response, pattern=^https://youtubei\.googleapis\.com/youtubei/v1/browse, requires-body=1, max-size=0, binary-body-mode=1, script-path=<URL>
- */
-(function () {
-  var TAG = "[yt-trial]";
-
-  // 内置美区方案卡块（冻结数据，运行时按当前响应校准标识符）
-  var OFFER_B64 =
-    "ssC9vwGUJQrbJJLJzskE1CQqHAhQELsvGAEiEwip5t+9xOOXAxVwkuUHHez+D3m6+9KSBa8kCuIjyuvqgwXbIxozksuhkAUt" +
-    "CitscF9zZWN0aW9uX2dyb3VwLmVtbC1qcy1mZXw0Zjc0MzMyNzI5MTgwZjU0KsohyqmiqQzDIQrSGPLG+oMOyxgKqg2Kyvav" +
-    "DqMNCj8KK0pvaW4gb3ZlciAxMjUgbWlsbGlvbiBQcmVtaXVt4oGgIOKBoG1lbWJlcnMyBAgAEAoyBAgKEAMyBAgNEBoS/gWS" +
-    "yvavDvcFChIKCkluZGl2aWR1YWwyBAgAEAoSFnl0X291dGxpbmVfcGVyc29uXzI0cHQaqQWy1PevDqIFCg8KB01vbnRobHky" +
-    "BAgAEAcSFwoPJDIwLjk54oCLL21vbnRoMgQIABANGikKFTEtbW9udGggdHJpYWwgZm9yICQwIDIECAAQEjIECBIQAjIECBQQ" +
-    "ASLcAQo+RnJlZSB0cmlhbCBmb3IgZWxpZ2libGUgbmV3IG1lbWJlcnMgb25seS4gUmVzdHJpY3Rpb25zIGFwcGx5LiAqfAgq" +
-    "EBMadrKtyYYFcBIkCFcQ7dIKGAAiEwip5t+9xOOXAxVwkuUHHez+D3nKAQTJEgbsqrnBvQFECkBodHRwczovL3d3dy55b3V0" +
-    "dWJlLmNvbS90L3Rlcm1zX3BhaWRzZXJ2aWNlP2Nocm9tZWxlc3M9MSNwcmVtaXVtEAEyBAgAECkyBAgpEAEyCggqEBMo1L+Z" +
-    "+A8yBAg9EAEqmwL6l+TeDZQCIqsBsq3JhgWkARIzCFgQnacBIhMIqebfvcTjlwMVcJLlBx3s/g95Mg95cGNfdHJhbnNhY3Rp" +
-    "b27KAQTJEgbs+uvOvQFpEmcSIghYEJ2nASITCKnm373E45cDFXCS5Qcd7P4PecoBBMkSBuzSoN25AT0SC1NQdW5saW1pdGVk" +
-    "GiRrZ01UT2dJSUFVb05DQVlTQ1hWdWJHbHRhWFJsWkElM0QlM0QiCC9wcmVtaXVtKhJUcnkgMSBtb250aCBmb3IgJDA4AUIb" +
-    "CFgQnacBIhMIqebfvcTjlwMVcJLlBx3s/g95WAFoBHABigETaWQueXBjLm9mZmVyLmJ1dHRvbpoBFAoSVHJ5IDEgbW9udGgg" +
-    "Zm9yICQwMhd1bmxpbWl0ZWQuUC5BQUFBQlA5QWJwUao+NAoyuj4vCh0IVxDt0goYACITCKnm373E45cDFXCS5Qcd7P4PeSIC" +
-    "CAw6Cgi42RAQoub7uwEqHQhXEO3SChgAIhMIqebfvcTjlwMVcJLlBx3s/g95Er8Gksr2rw64BgoOCgZGYW1pbHkyBAgAEAYS" +
-    "Fnl0X291dGxpbmVfcGVvcGxlXzI0cHQa7gWy1PevDucFCg8KB01vbnRobHkyBAgAEAcSFwoPJDM0Ljk54oCLL21vbnRoMgQI" +
-    "ABANGikKFTEtbW9udGggdHJpYWwgZm9yICQwIDIECAAQEjIECBIQAjIECBQQASKhAgp3QWRkIHVwIHRvIDUgZmFtaWx5IG1l" +
-    "bWJlcnMgKGFnZXMgMTMrKSBpbiB5b3VyIGhvdXNlaG9sZC4gRnJlZSB0cmlhbCBmb3IgZWxpZ2libGUgbmV3IG1lbWJlcnMg" +
-    "b25seS4gUmVzdHJpY3Rpb25zIGFwcGx5LiAqfAhjEBMadrKtyYYFcBIkCFUQ7dIKGAEiEwip5t+9xOOXAxVwkuUHHez+D3nK" +
-    "AQTJEgbsqrnBvQFECkBodHRwczovL3d3dy55b3V0dWJlLmNvbS90L3Rlcm1zX3BhaWRzZXJ2aWNlP2Nocm9tZWxlc3M9MSNw" +
-    "cmVtaXVtEAEyBAgAEDgyBAg4EAEyBAg5ECkyBAhiEAEyCghjEBMo1L+Z+A8yBAh2EAEqmwL6l+TeDZQCIqsBsq3JhgWkARIz" +
-    "CFYQnacBIhMIqebfvcTjlwMVcJLlBx3s/g95Mg95cGNfdHJhbnNhY3Rpb27KAQTJEgbs+uvOvQFpEmcSIghWEJ2nASITCKnm" +
-    "373E45cDFXCS5Qcd7P4PecoBBMkSBuzSoN25AT0SC1NQdW5saW1pdGVkGiRrZ01UT2dJSUNFb05DQVlTQ1hWdWJHbHRhWFJs" +
-    "WkElM0QlM0QiCC9wcmVtaXVtKhJUcnkgMSBtb250aCBmb3IgJDA4AUIbCFYQnacBIhMIqebfvcTjlwMVcJLlBx3s/g95WAVo" +
-    "BHABigETaWQueXBjLm9mZmVyLmJ1dHRvbpoBFAoSVHJ5IDEgbW9udGggZm9yICQwMhd1bmxpbWl0ZWQuUC5BQUFBQlA5QWJw" +
-    "c6o+NAoyuj4vCh0IVRDt0goYASITCKnm373E45cDFXCS5Qcd7P4PeSICCAw6Cgi42RAQoeb7uwEqHQhVEO3SChgBIhMIqebf" +
-    "vcTjlwMVcJLlBx3s/g95Ih0IVBCVjwoYAyITCKnm373E45cDFXCS5Qcd7P4PeQqiCorK9q8OmwoKLwobU2F2ZSA0MyUgd2l0" +
-    "aCBQcmVtaXVtIExpdGUqMgQIABAFMgQIBRADMgQICBATEpsIksr2rw6UCAoUCgxQcmVtaXVtIExpdGUyBAgAEAwSFnl0X291" +
-    "dGxpbmVfcGVyc29uXzI0cHQalAey1PevDo0HCg8KB01vbnRobHkyBAgAEAcSFwoPJDExLjk54oCLL21vbnRoMgQIABANGikK" +
-    "FTEtbW9udGggdHJpYWwgZm9yICQwIDIECAAQEjIECBIQAjIECBQQASKsAgqWAVByZW1pdW0gTGl0ZSBiZW5lZml0cyBhdmFp" +
-    "bGFibGUgb24gbW9zdCBub24tbXVzaWMgY29udGVudCwgZXhjbHVkaW5nIFNob3J0cy4gQWRzIG1heSBhcHBlYXIgd2hlbiB5" +
-    "b3Ugc2VhcmNoIG9yIGJyb3dzZS4gUmVzdHJpY3Rpb25zIGFwcGx5LiBMZWFybiBtb3JlLip9CIsBEAsadrKtyYYFcBIkCFIQ" +
-    "7dIKGAAiEwip5t+9xOOXAxVwkuUHHez+D3nKAQTJEgbsqrnBvQFECkJodHRwczovL3N1cHBvcnQuZ29vZ2xlLmNvbS95b3V0" +
-    "dWJlL2Fuc3dlci8xNTk2ODg4MyNiYWNrZ3JvdW5kX3BsYXkyBQgAEIsBMgsIiwEQCyjUv5n4DyqlAvqX5N4NngIitQGyrcmG" +
-    "Ba4BEjMIUxCdpwEiEwip5t+9xOOXAxVwkuUHHez+D3kyD3lwY190cmFuc2FjdGlvbsoBBMkSBuz66869AXMScRIiCFMQnacB" +
-    "IhMIqebfvcTjlwMVcJLlBx3s/g95ygEEyRIG7NKg3bkBRxILU1B1bmxpbWl0ZWQaKmtnTWFPZ0lJQVVvVUNBWVNFSFZ1Ykds" +
-    "dGFYUmxaQzFDTFhKMVluayUzRCIML3ByZW1pdW1saXRlKhJUcnkgMSBtb250aCBmb3IgJDA4AUIbCFMQnacBIhMIqebfvcTj" +
-    "lwMVcJLlBx3s/g95WAFoBHABigETaWQueXBjLm9mZmVyLmJ1dHRvbpoBFAoSVHJ5IDEgbW9udGggZm9yICQwMh51bmxpbWl0" +
-    "ZWQtQi1ydWJ5LlAuQUFBQUJQODdIMVlKH/ppHAjYARIVCg1BZC1mcmVlIHZpZGVvMgQIABANGANKIfppHgjYARIXCg9CYWNr" +
-    "Z3JvdW5kIHBsYXkyBAgAEA8YA0ob+mkYCNgBEhEKCURvd25sb2FkczIECAAQCRgDSif6aSQI1wESHQoVQWQtZnJlZSBZb3VU" +
-    "dWJlIE11c2ljMgQIABAVGASqPjQKMro+LwodCFIQ7dIKGAAiEwip5t+9xOOXAxVwkuUHHez+D3kiAggMOgoIuNkQEKDm+7sB" +
-    "Kh0IUhDt0goYACITCKnm373E45cDFXCS5Qcd7P4PeUIu2kcrCghTYXZlIDQzJRguIh0IUhDt0goYACITCKnm373E45cDFXCS" +
-    "5Qcd7P4PeSIdCFEQlY8KGAQiEwip5t+9xOOXAxVwkuUHHez+D3kyYApYRW5qb3kgYWQtZnJlZSB2aWRlb3MsIGRvd25sb2Fk" +
-    "cywgYW5kIHBsYXkgaW4gdGhlIGJhY2tncm91bmQgKGV4Y2x1ZGluZyBtdXNpYyBhbmQgU2hvcnRzKTIECAAQWDpJCjUqNDMl" +
-    "IGNoZWFwZXIgdGhhbiB0aGUgUHJlbWl1bSBNb250aGx5IEluZGl2aWR1YWwgcGxhbjIECAAQATIECAEQAzIECAQQMRoSb2Zm" +
-    "ZXJfY2FyZF9zZWN0aW9uMmMveW91dHViZS9lY29tbWVyY2UvcHJvbW9fdGFyZ2V0aW5nL2Zyb250ZW5kL2ZpbGxlcnMvZmxl" +
-    "eGlibGUvcHJlbWl1bS9ub19vcF9wcmVtaXVtX3N0YXRlX2VudGl0eV9rZXka5Qj6PgQIBRABkj8Ayj8ECgIIAcK4ib4KiQMK" +
-    "hAM4AUABUAFYAWAFmAEBoAEB4AEBiAIBoAIB0AIBmAMBoAMB0AMB6AMBmAQB0AQB6AQBsAUB2AUB5QXNzEw/7QXNzEw/9QVm" +
-    "ZuY/iAYBmAYBoAYBuAYB4AYB6AYBlQcAAFJEuAcBsAgB8AgBiAkBuAkB4AkB+AkBgAoBiAoB4AoB6AoBmAsBoAsByAsB8AsB" +
-    "iAwBmAwBuAwB2AwBgA0BkA0BoA0BqA0BsA0BuA0ByA0B8A0B+A0BgA4BiA4BmA4BqA4BsA4B0A4B4A4B8A4B+A4B0A8B4A8B" +
-    "6A8B8A8BgBABkBABoBABqBABsBABuBAByBAB2BABqBEBuBEByBEB2BEB8BEBiBIBsBIBwBIByBIB0BIB6BIB8BIB+BIBiBMB" +
-    "mBMBwBMB2BMB4BMB6BMB8BMB+BMBgBQBiBQBkBQBoBQBqBQBwBQB1RQAAIBB2BQB4BQB6BQB8BQB+BQBgBUBqBUBsBUB2BUB" +
-    "4BUB+BUBwBcB8BcB+BcBkBgBuBgB0BgB2BgB4BgBEAXKuIm+CiIKIAgBEAE4AUABUAFYAXgBqAEBsAEBuAEByAEB6AEB+AEB" +
-    "isKjxg0LCICw59/16Ky8hQG6pPODDhgKFnRoZW1lfDM4MWMzMTk4N2QwOWRlMDGyuZ6LDi4KLAgBQAFQAVgBdQAAgD+FATMz" +
-    "Mz+NAQAAAD+wAQHQAafOnPkPqAIBuAIB6AIBoq/gjQ76Awr3A6gBAaACiCftAwAAAD+oBAGABQGVBQAAAD/lBc3MTD7tBQAA" +
-    "AD/9BQAAIEGIBgGoBgGwBgHFBs3MzD7QBgXYBwG4CAHYCAGQCQGyCQdkaXNtaXNzwAkB0AkBiAoB2AoBoAsB2AsB3QwAAIC/" +
-    "7QwAAIC/9QwAAIC/pQ4AAIC/rQ4AAIC/mA8BqBAB0BAB4BAB6BABkBEBmBEB5REAAIBA9REAAIBAhRIAAIBAlRIAAIBApRIA" +
-    "AIBAsBIB4BIB+BIBiBMBqBMBzRMAAIBA3RMAAIBA4BMB6BMBgBQBmBQBoBQBshQkS0VOX0JVUk5TX0FOSU1BVElPTl9UWVBF" +
-    "X1VOU1BFQ0lGSUVEuBQB0BQB2BQB6BQB/RQAAIBAkBUBqBUBsBUBuBUBwBUB0BUB2BUB4BUB6BUBiBYBkBYBoBYBsBYBuBYB" +
-    "wBYB0BYCiBcBmBcBqBcB2BcB8BcBuBgBgBkBiBkBkBkBoBkBsBkBuBkBwBkByBkB0BkB4BkB6BkB+BkBgBoBiBoBmBoBoBoB" +
-    "qBoBsBoBuBoQ2BoBiBsBkBsBmBsBoBsB0BsB2BsB4BsB6BsBgBwBsBwQuBwBwBwByBwBiB0BkB0BmB0BoB0BqB0B2B0B4B0B" +
-    "8B0BkB4BmB4B4B4B+B4YsB8BuB8B+B8BwCAB6CAB+CABiCIB0r+Zpw4ECgI4AcrDyKcOGBIWEAEgAaABAfABAdADAfADAYgE" +
-    "AdgEAbrilq8PCgoECAQQARICCAEiACoCKAEy1gG6l4TPBXcKbwpjL3lvdXR1YmUvZWNvbW1lcmNlL3Byb21vX3RhcmdldGlu" +
-    "Zy9mcm9udGVuZC9maWxsZXJzL2ZsZXhpYmxlL3ByZW1pdW0vbm9fb3BfcHJlbWl1bV9zdGF0ZV9lbnRpdHlfa2V5GAEY7qi/" +
-    "4AEYBxCZpZTFAarx38ELJAocChgKFnRoZW1lfDM4MWMzMTk4N2QwOWRlMDEQBBCZpZTFAbLx38ELKQohCh1jYXBhYmlsaXRp" +
-    "ZXN8NTY2MmQwZjk0NzQ1YzBhNxAGEJmllMUBEkjChqW7BUIKK2xwX3NlY3Rpb25fZ3JvdXAuZW1sLWpzLWZlfDRmNzQzMzI3" +
-    "MjkxODBmNTQyEzE3OTM0MjQ5MjcyMjIzOTUzNjUiHAhQELsvGAEiEwip5t+9xOOXAxVwkuUHHez+D3k6Em9mZmVyX2NhcmRf" +
-    "c2VjdGlvblICCAA=";;
-
-  // ---------------- protobuf ----------------
-  function readVarint(b, i) {
-    var r = 0, s = 0, x;
-    do { if (i >= b.length) throw "eof"; x = b[i++]; r += (x & 0x7f) * Math.pow(2, s); s += 7; } while (x & 0x80);
-    return [r, i];
-  }
-  function writeVarint(n) {
-    var o = [];
-    while (true) { var b = n & 0x7f; n = Math.floor(n / 128); if (n > 0) o.push(b | 0x80); else { o.push(b); break; } }
-    return o;
-  }
-  function parseFields(b, start, end) {
-    var out = [], i = start;
-    while (i < end) {
-      var kv = readVarint(b, i), key = kv[0]; i = kv[1];
-      var fn = Math.floor(key / 8), wt = key & 7;
-      if (wt === 0) { var r = readVarint(b, i); out.push([fn, 0, r[0]]); i = r[1]; }
-      else if (wt === 2) {
-        var lr = readVarint(b, i), len = lr[0], vs = lr[1], ve = vs + len;
-        if (ve > end) throw "overrun";
-        out.push([fn, 2, b.subarray(vs, ve)]); i = ve;
-      } else if (wt === 1) { out.push([fn, 1, b.subarray(i, i + 8)]); i += 8; }
-      else if (wt === 5) { out.push([fn, 5, b.subarray(i, i + 4)]); i += 4; }
-      else throw "wt" + wt;
-    }
-    return out;
-  }
-  function serialize(fields) {
-    var out = [];
-    for (var k = 0; k < fields.length; k++) {
-      var fn = fields[k][0], wt = fields[k][1], v = fields[k][2];
-      var kb = writeVarint(fn * 8 + wt);
-      for (var a = 0; a < kb.length; a++) out.push(kb[a]);
-      if (wt === 0) { var vb = writeVarint(v); for (var b = 0; b < vb.length; b++) out.push(vb[b]); }
-      else if (wt === 2) {
-        var lb = writeVarint(v.length);
-        for (var c = 0; c < lb.length; c++) out.push(lb[c]);
-        for (var d = 0; d < v.length; d++) out.push(v[d]);
-      } else { for (var e = 0; e < v.length; e++) out.push(v[e]); }
-    }
-    return out;
-  }
-  function toStr(u8) {
-    var s = "", CH = 8192;
-    for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + CH, u8.length)));
-    return s;
-  }
-  function strToBytes(str) {
-    var a = new Uint8Array(str.length);
-    for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 0xff;
-    return a;
-  }
-  function b64decode(str) {
-    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    var map = {}, i;
-    for (i = 0; i < chars.length; i++) map[chars[i]] = i;
-    var out = [], buf = 0, bits = 0;
-    for (i = 0; i < str.length; i++) {
-      var c = str[i];
-      if (c === "=") break;
-      var v = map[c];
-      if (v === undefined) continue;
-      buf = (buf << 6) | v; bits += 6;
-      if (bits >= 8) { bits -= 8; out.push((buf >> bits) & 0xff); }
+(function(){
+  function rv(b,i){var r=0,s=0,x;do{x=b[i++];r+=(x&0x7f)*Math.pow(2,s);s+=7;}while(x&0x80);return[r,i];}
+  function wv(n){var o=[];while(true){var b=n&0x7f;n=Math.floor(n/128);if(n>0)o.push(b|0x80);else{o.push(b);break;}}return o;}
+  function parse(b,st,en){var out=[],i=st;while(i<en){var kv=rv(b,i),k=kv[0];i=kv[1];var fn=Math.floor(k/8),wt=k&7;
+    if(wt===0){var r=rv(b,i);out.push([fn,0,r[0]]);i=r[1];}
+    else if(wt===2){var lr=rv(b,i),l=lr[0],vs=lr[1],ve=vs+l;out.push([fn,2,b.subarray(vs,ve)]);i=ve;}
+    else if(wt===1){out.push([fn,1,b.subarray(i,i+8)]);i+=8;}
+    else if(wt===5){out.push([fn,5,b.subarray(i,i+4)]);i+=4;}
+    else throw "wt"+wt;}return out;}
+  function ser(fs){var o=[];for(var k=0;k<fs.length;k++){var fn=fs[k][0],wt=fs[k][1],v=fs[k][2];var kb=wv(fn*8+wt);
+    for(var a=0;a<kb.length;a++)o.push(kb[a]);
+    if(wt===0){var vb=wv(v);for(var b=0;b<vb.length;b++)o.push(vb[b]);}
+    else if(wt===2){var lb=wv(v.length);for(var c=0;c<lb.length;c++)o.push(lb[c]);for(var d=0;d<v.length;d++)o.push(v[d]);}
+    else{for(var e=0;e<v.length;e++)o.push(v[e]);}}return o;}
+  function ts(u8){var s="",CH=8192;for(var i=0;i<u8.length;i+=CH)s+=String.fromCharCode.apply(null,u8.subarray(i,Math.min(i+CH,u8.length)));return s;}
+  function tb(str){
+    // 正确 UTF-8 编码（中文 3 字节）
+    var out=[];
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      if(c<0x80) out.push(c);
+      else if(c<0x800){ out.push(0xc0|(c>>6), 0x80|(c&0x3f)); }
+      else { out.push(0xe0|(c>>12), 0x80|((c>>6)&0x3f), 0x80|(c&0x3f)); }
     }
     return new Uint8Array(out);
   }
-  function contains(buf, needle) {
-    if (!buf || buf.length < needle.length) return false;
-    var m = needle.length, win = "";
-    for (var i = 0; i < buf.length; i++) {
-      win += String.fromCharCode(buf[i]);
-      if (win.length > m) win = win.slice(1);
-      if (win.length === m && win === needle) return true;
+  function has(buf,needle){return ts(buf).indexOf(needle)>=0;}
+
+  var LBL={ "family.red.subscription":"家庭试用", "premiumLite":"Lite 试用", "red.subscription":"个人试用" };
+  function labelFor(s){
+    if(s.indexOf("family.red.subscription")>=0) return LBL["family.red.subscription"];
+    if(s.indexOf("premiumLite")>=0) return LBL["premiumLite"];
+    if(s.indexOf("red.subscription")>=0) return LBL["red.subscription"];
+    return null;
+  }
+
+  // 改按钮文字
+  function relabel(btn,label){
+    if(!label) return btn;
+    var fs; try{fs=parse(btn,0,btn.length);}catch(e){return btn;}
+    var out=[];
+    for(var i=0;i<fs.length;i++){
+      var fn=fs[i][0],wt=fs[i][1],v=fs[i][2];
+      if(fn===461054335 && wt===2){
+        var inner; try{inner=parse(v,0,v.length);}catch(e){out.push([fn,wt,v]);continue;}
+        var io=[];
+        for(var j=0;j<inner.length;j++){
+          var f2=inner[j][0],w2=inner[j][1],v2=inner[j][2];
+          if(f2===5 && w2===2) io.push([5,2,tb(label)]);
+          else if(f2===19 && w2===2){
+            var sf; try{sf=parse(v2,0,v2.length);}catch(e){io.push([f2,w2,v2]);continue;}
+            var so=[];
+            for(var k=0;k<sf.length;k++){ if(sf[k][0]===1) so.push([1,2,tb(label)]); else so.push([sf[k][0],sf[k][1],sf[k][2]]); }
+            io.push([19,2,new Uint8Array(ser(so))]);
+          } else io.push([f2,w2,v2]);
+        }
+        out.push([fn,wt,new Uint8Array(ser(io))]);
+      } else out.push([fn,wt,v]);
+    }
+    return new Uint8Array(ser(out));
+  }
+
+  // 削卡：留 f1(名称) + f3 里的按钮(f5)和商品号(f6)
+  function stripCard(fs,label){
+    var out=[];
+    for(var i=0;i<fs.length;i++){
+      var fn=fs[i][0],wt=fs[i][1],v=fs[i][2];
+      if(fn===3 && wt===2){
+        var pf; try{pf=parse(v,0,v.length);}catch(e){continue;}
+        var po=[];
+        for(var k=0;k<pf.length;k++){
+          if(pf[k][0]===482327878 && pf[k][1]===2){
+            var df; try{df=parse(pf[k][2],0,pf[k][2].length);}catch(e){continue;}
+            var dout=[];
+            for(var m=0;m<df.length;m++){
+              var f4=df[m][0];
+              if(f4===5) dout.push([5,2,relabel(df[m][2],label)]);
+              else if(f4===6) dout.push([6,2,df[m][2]]);
+            }
+            po.push([482327878,2,new Uint8Array(ser(dout))]);
+          }
+        }
+        out.push([3,2,new Uint8Array(ser(po))]);
+      }
+    }
+    return new Uint8Array(ser(out));
+  }
+
+
+  // 只在字段号为 482325666（卡片内容）时削卡，避免误伤祖先节点
+  function walk(buf,parentField){
+    var fs; try{fs=parse(buf,0,buf.length);}catch(e){return null;}
+    var out=[],changed=false;
+    for(var i=0;i<fs.length;i++){
+      var fn=fs[i][0],wt=fs[i][1],v=fs[i][2];
+      // 卡片组 482325665：丢掉 f1 标题("加入超过125百万名...")
+      if(wt===2 && fn===482325665){
+        var gf; try{gf=parse(v,0,v.length);}catch(e){gf=null;}
+        if(gf){
+          var go=[],gch=false;
+          for(var q=0;q<gf.length;q++){
+            if(gf[q][0]===1){ gch=true; continue; }
+            var qv=gf[q][2];
+            if(gf[q][0]===2 && gf[q][1]===2 && qv.length>100){
+              var sub2=walk(qv,2);
+              if(sub2){ go.push([2,2,sub2]); gch=true; continue; }
+            }
+            go.push([gf[q][0],gf[q][1],qv]);
+          }
+          if(gch){ out.push([fn,2,new Uint8Array(ser(go))]); changed=true; continue; }
+        }
+      }
+      if(wt===2 && fn===482325666 && v.length>300 && v.length<6000){
+        var sub; try{sub=parse(v,0,v.length);}catch(e){sub=null;}
+        if(sub){
+          var lab=labelFor(ts(v));
+          var st=stripCard(sub,lab);
+          out.push([fn,2,st]); changed=true; continue;
+        }
+      }
+      if(wt===2 && v.length>100){
+        var deeper=walk(v,fn);
+        if(deeper){ out.push([fn,2,deeper]); changed=true; continue; }
+      }
+      out.push([fn,wt,v]);
+    }
+    return changed ? new Uint8Array(ser(out)) : null;
+  }
+
+
+  // 判定：含 482325666 节点且其直接子字段恰为 {1,3}
+  function hasStrippedCard(buf){
+    var fs; try{fs=parse(buf,0,buf.length);}catch(e){return false;}
+    for(var i=0;i<fs.length;i++){
+      var fn=fs[i][0],wt=fs[i][1],v=fs[i][2];
+      if(wt===2 && fn===482325666 && v.length>200){
+        var sf; try{sf=parse(v,0,v.length);}catch(e){continue;}
+        var sig={}; for(var j=0;j<sf.length;j++) sig[sf[j][0]]=1;
+        // 已削卡特征：只有 f3(按钮)，无 f2(图标)，无 f5
+        if(sig[3] && !sig[2] && !sig[5]) return true;
+      }
+      if(wt===2 && v.length>100 && hasStrippedCard(v)) return true;
     }
     return false;
   }
 
-  // 从整包响应里收集所有 "<name>|<16位hex>" 标识符，按名字建表
-  function collectIds(bodyStr) {
-    var table = {};
-    var re = /([a-z0-9_]+\.eml-(?:js-)?fe|theme|capabilities)\|([0-9a-f]{16})/g;
-    var m;
-    while ((m = re.exec(bodyStr)) !== null) {
-      if (!table[m[1]]) table[m[1]] = m[2];
+  // 只保留含按钮的那个 section，其余营销区块全删
+  function slimSectionList(buf){
+    var fs; try{fs=parse(buf,0,buf.length);}catch(e){return null;}
+    var contents=[],others=[];
+    for(var i=0;i<fs.length;i++){
+      if(fs[i][0]===1 && fs[i][1]===2) contents.push(fs[i][2]);
+      else others.push([fs[i][0],fs[i][1],fs[i][2]]);
     }
-    return table;
-  }
-
-  // 用当前响应的标识符校准内置块：只替换 hash，保持块结构不变
-  function calibrate(blockStr, ids) {
-    var changed = [];
-    var re = /([a-z0-9_]+\.eml-(?:js-)?fe|theme|capabilities)\|([0-9a-f]{16})/g;
-    var out = blockStr.replace(re, function (all, name, oldHash) {
-      if (ids[name] && ids[name] !== oldHash) {
-        changed.push(name + ":" + oldHash + "->" + ids[name]);
-        return name + "|" + ids[name];
-      }
-      return all;
-    });
-    return { text: out, changed: changed };
-  }
-
-  // sectionListRenderer 在 iOS browse 响应里的固定路径
-  var SL_PATH = [58173949, 1, 58174010, 4, 49399797];
-
-  // 把 sectionList 的 contents 整个换成内置块（保留 targetId 等其它字段）
-  function replaceSectionList(buf, block) {
-    var fields;
-    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var out = [], placed = false;
-    for (var i = 0; i < fields.length; i++) {
-      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (fn === 1 && wt === 2) {
-        if (!placed) { out.push([1, 2, block]); placed = true; }
-        continue;                                  // 其余旧 section 全丢
-      }
-      out.push([fn, wt, v]);
+    var keep=[];
+    for(var j=0;j<contents.length;j++){
+      // 只保留含"已削卡"(482325666 子字段恰为 1,3)的 section
+      if(hasStrippedCard(contents[j])) keep.push(contents[j]);
     }
-    if (!placed) out.unshift([1, 2, block]);
-    return serialize(out);
+    if(!keep.length) return null;
+    var out=[];
+    for(var k=0;k<keep.length;k++) out.push([1,2,keep[k]]);
+    for(var m=0;m<others.length;m++) out.push(others[m]);
+    return new Uint8Array(ser(out));
   }
 
-  function descend(buf, depth, block) {
-    var fields;
-    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    if (depth >= SL_PATH.length) return replaceSectionList(buf, block);
-    var target = SL_PATH[depth], out = [], done = false;
-    for (var i = 0; i < fields.length; i++) {
-      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (fn === target && wt === 2 && !done) {
-        var sub = descend(v, depth + 1, block);
-        if (sub) { out.push([fn, 2, sub]); done = true; continue; }
+  var SL=[58173949,1,58174010,4,49399797];
+  function descend(buf,d){
+    var fs; try{fs=parse(buf,0,buf.length);}catch(e){return null;}
+    if(d>=SL.length){ return slimSectionList(buf); }
+    var target=SL[d], out=[], done=false;
+    for(var i=0;i<fs.length;i++){
+      var fn=fs[i][0],wt=fs[i][1],v=fs[i][2];
+      if(fn===target && wt===2 && !done){
+        var sub=descend(v,d+1);
+        if(sub){ out.push([fn,2,sub]); done=true; continue; }
       }
-      out.push([fn, wt, v]);
+      out.push([fn,wt,v]);
     }
-    return done ? serialize(out) : null;
+    return done ? new Uint8Array(ser(out)) : null;
   }
 
-  // ---------------- 主流程 ----------------
-  var body = $response.body;
-  if (!body || typeof body.length !== "number") { $done({}); return; }
+  var body=$response.body;
+  if(!body || typeof body.length!=="number"){ $done({}); return; }
+  if(!has(body,"premium_page_section_list")){ $done({}); return; }
 
-  var bodyStr = toStr(body);
-  if (bodyStr.indexOf("premium_page_section_list") < 0) { $done({}); return; }  // 非 Premium 页放行
+  // 先削卡片
+  var r1=walk(body,0);
+  var stage1 = r1 ? r1 : body;
 
-  var top;
-  try { top = parseFields(body, 0, body.length); } catch (e) { console.log(TAG + " parse fail"); $done({}); return; }
+  // 再只留按钮 section
+  var top; try{top=parse(stage1,0,stage1.length);}catch(e){ $done({}); return; }
+  var f9=null;
+  for(var i=0;i<top.length;i++) if(top[i][0]===9 && top[i][1]===2) f9=top[i][2];
+  if(!f9){ $done({}); return; }
+  var newF9=descend(f9,0);
+  if(!newF9){ console.log("[mini] sectionList not found -> pass"); $done({}); return; }
 
-  var f9 = null;
-  for (var i = 0; i < top.length; i++) if (top[i][0] === 9 && top[i][1] === 2) f9 = top[i][2];
-  if (!f9) { console.log(TAG + " no field9"); $done({}); return; }
-
-  // 校准内置块：以 field777（渲染器注册表，标识符最全）为主，field9 兜底
-  var ids = {};
-  var reg = null;
-  for (var r = 0; r < top.length; r++) if (top[r][0] === 777 && top[r][1] === 2) reg = top[r][2];
-  if (reg) ids = collectIds(toStr(reg));
-  var pageIds = collectIds(bodyStr);
-  for (var key in pageIds) if (!ids[key]) ids[key] = pageIds[key];
-  var blockStr = toStr(b64decode(OFFER_B64));
-  var cal = calibrate(blockStr, ids);
-  var block = strToBytes(cal.text);
-
-  var newF9 = descend(f9, 0, block);
-  if (!newF9) { console.log(TAG + " sectionList not found -> pass"); $done({}); return; }
-
-  var out = [], hit = false;
-  for (var k = 0; k < top.length; k++) {
-    if (top[k][0] === 9 && top[k][1] === 2 && !hit) { out.push([9, 2, newF9]); hit = true; }
-    else out.push([top[k][0], top[k][1], top[k][2]]);
+  var out=[],hit=false;
+  for(var k=0;k<top.length;k++){
+    if(top[k][0]===9 && top[k][1]===2 && !hit){ out.push([9,2,newF9]); hit=true; }
+    else out.push([top[k][0],top[k][1],top[k][2]]);
   }
-  var final = new Uint8Array(serialize(out));
-  console.log(TAG + " builtin-only " + body.length + " -> " + final.length + "B" +
-              (cal.changed.length ? "  recalibrated[" + cal.changed.join(", ") + "]" : "  ids-ok"));
-  $done({ body: final });
+  var final=new Uint8Array(ser(out));
+  console.log("[mini] " + body.length + " -> " + final.length + "B");
+  $done({body:final});
 })();
