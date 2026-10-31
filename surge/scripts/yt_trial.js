@@ -1,31 +1,26 @@
 /**
- * yt_trial.js —— YouTube Premium 试用页统一处理（Surge http-response）
+ * yt_trial.js —— YouTube Premium 极简页（Surge http-response）
  *
- * 目标：任何账号打开 Premium 页，都至少有一个可点的方案按钮。
+ * 目标：所有账号打开 Premium 页，都只剩方案按钮，没有营销/FAQ/轮播。
  *
- * 设计铁律（血泪教训）：
- *   能冻进脚本的只有“数据”，绝不冻渲染器。
- *   旧版把整页换成旧模板，里面冻着 lp2_option_selection_flow_step|57e2e2c3…，
- *   线上早已是 6867b0a3…，于是好页面被换坏 -> 白屏。
- *   旧版按钮还故意不带购买令牌（command.10），于是“看得到点不动”。
+ * 为什么不再整页套模板：
+ *   旧版把整页换成一份冻结的旧模板，里面冻着
+ *   lp2_option_selection_flow_step|57e2e2c3…，线上早已是 6867b0a3…，
+ *   于是好页面被换坏 -> 白屏；按钮还缺购买令牌 -> 点了没反应。
  *
- * 本版按页面状态分三档，只在前两档动手：
+ * 本版做法（抗更新的关键）：
+ *   1. 运行时从“同一个响应”里把方案卡 section 原样抽出来
+ *      （判据：含 id.ypc.offer.button 且有 unlimited.*.P.* 商品号）；
+ *   2. sectionList.contents 只留这一块，其余营销内容全丢；
+ *   3. 抽出来的是服务端当版字节，渲染器哈希天然是当前的，不会过期。
  *
- *   A 好页面：有真实商品号，且无 _NFT
- *       -> 原样放行，一个字节都不改（好账号靠这档，绝不制造白屏）
+ * 页面里没有方案卡时（无资格页），才用内置块兜底（同源真实数据）。
  *
- *   B 无试用：有商品号，但带 _NFT 后缀
- *       -> 原地去掉 _NFT，换成带试用的真实 SKU，页面结构不动
- *
- *   C 无按钮 / 空方案区：页面里没有任何商品号
- *       -> 把内置的方案卡块（真实抓包，4.7KB）插到 sectionList 最前面。
- *          该块只依赖 lp_section_group 渲染器（跨版本未变），
- *          不含会话令牌，属于纯数据注入，App 升级不受影响。
- *
- * 注入块来源：iOS 21.42.4 真实响应 sectionList.contents[1]
- *   productId: unlimited.P.AAAABP9AbpQ / Abps / unlimited-B-ruby...87H1Y
- *   渲染器: lp_section_group.eml-js-fe|4f74332729180f54
- *   长 token(>=200): 0   flowStateEntityKey: 0   roundtrip: 无损
+ * 内置块来源：iOS 21.42.4 真实响应 sectionList.contents[1]
+ *   Individual unlimited.P.AAAABP9AbpQ / Family unlimited.P.AAAABP9Abps
+ *   Premium Lite unlimited-B-ruby.P.AAAABP87H1Y
+ *   渲染器 lp_section_group.eml-js-fe|4f74332729180f54（跨版本未变）
+ *   无会话令牌，roundtrip 无损
  *
  * [Script]
  * yt-trial = type=http-response, pattern=^https://youtubei\.googleapis\.com/youtubei/v1/browse, requires-body=1, max-size=0, binary-body-mode=1, script-path=<URL>
@@ -33,14 +28,7 @@
 (function () {
   var TAG = "[yt-trial]";
 
-  // B 档：无试用 SKU -> 带试用 SKU
-  var SKU_MAP = {
-    "com.google.youtube.red.subscription_NFT":                  "com.google.youtube.red.subscription",
-    "com.google.youtube.family.red.subscription_NFT":           "com.google.youtube.family.red.subscription",
-    "com.google.youtube.premiumLite.subscriptionLiteGroup_NFT": "com.google.youtube.premiumLite.subscriptionLiteGroup"
-  };
-
-  // C 档：内置方案卡块（真实响应 sectionList.contents[1]，纯数据）
+  // 无资格页兜底块（真实数据，纯 model，不含会话令牌）
   var OFFER_B64 =
     "ssC9vwGUJQrbJJLJzskE1CQqHAhQELsvGAEiEwip5t+9xOOXAxVwkuUHHez+D3m6+9KSBa8kCuIjyuvqgwXbIxozksuhkAUt" +
     "CitscF9zZWN0aW9uX2dyb3VwLmVtbC1qcy1mZXw0Zjc0MzMyNzI5MTgwZjU0KsohyqmiqQzDIQrSGPLG+oMOyxgKqg2Kyvav" +
@@ -110,7 +98,7 @@
     "MjkxODBmNTQyEzE3OTM0MjQ5MjcyMjIzOTUzNjUiHAhQELsvGAEiEwip5t+9xOOXAxVwkuUHHez+D3k6Em9mZmVyX2NhcmRf" +
     "c2VjdGlvblICCAA=";;
 
-  // ---------------- protobuf 基础 ----------------
+  // ---------------- protobuf ----------------
   function readVarint(b, i) {
     var r = 0, s = 0, x;
     do { if (i >= b.length) throw "eof"; x = b[i++]; r += (x & 0x7f) * Math.pow(2, s); s += 7; } while (x & 0x80);
@@ -177,116 +165,92 @@
     }
     return new Uint8Array(out);
   }
-  function looksLikeMsg(b) {
-    if (!b || b.length < 2) return false;
-    try { return parseFields(b, 0, b.length).length > 0; } catch (e) { return false; }
-  }
-
-  // ---------------- B 档：只改 SKU 字符串 ----------------
-  var skuPatched = [];
-  function deNFT(buf) {
-    var fields;
-    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var changed = false, out = [];
-    for (var i = 0; i < fields.length; i++) {
-      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      if (wt === 2 && v.length > 15 && v.length < 120) {
-        var t = toStr(v);
-        if (SKU_MAP[t]) {
-          out.push([fn, 2, strToBytes(SKU_MAP[t])]);
-          skuPatched.push(t.replace("com.google.youtube.", ""));
-          changed = true; continue;
-        }
-      }
-      if (wt === 2 && v.length > 2 && looksLikeMsg(v)) {
-        var sub = deNFT(v);
-        if (sub) { out.push([fn, 2, sub]); changed = true; continue; }
-      }
-      out.push([fn, wt, v]);
+  function contains(buf, needle) {
+    if (!buf || buf.length < needle.length) return false;
+    var m = needle.length, win = "";
+    for (var i = 0; i < buf.length; i++) {
+      win += String.fromCharCode(buf[i]);
+      if (win.length > m) win = win.slice(1);
+      if (win.length === m && win === needle) return true;
     }
-    return changed ? serialize(out) : null;
+    return false;
   }
 
-  // ---------------- C 档：把方案卡块插到 sectionList 最前 ----------------
-  // iOS browse 响应里 sectionListRenderer 的固定路径：
-  //   field9 -> 58173949 -> 1 -> 58174010 -> 4 -> 49399797
+  // sectionListRenderer 在 iOS browse 响应里的固定路径
   var SL_PATH = [58173949, 1, 58174010, 4, 49399797];
 
-  function injectIntoSectionList(buf) {
-    var fields;
-    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var offer = b64decode(OFFER_B64);
-    var out = [], placed = false;
-    for (var i = 0; i < fields.length; i++) {
-      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
-      // contents 是 repeated field 1，插到第一条之前
-      if (fn === 1 && wt === 2 && !placed) { out.push([1, 2, offer]); placed = true; }
-      out.push([fn, wt, v]);
-    }
-    if (!placed) { out.unshift([1, 2, offer]); placed = true; }
-    return placed ? serialize(out) : null;
+  // 判断一个 section 是否是“方案卡”：带按钮 + 带真实商品号，且体积不大
+  function isOfferSection(v) {
+    if (!v || v.length < 300 || v.length > 9000) return false;
+    if (!contains(v, "id.ypc.offer.button")) return false;
+    var s = toStr(v);
+    return s.indexOf("unlimited.P.") >= 0 || s.indexOf("unlimited-B-") >= 0;
   }
 
-  function descend(buf, depth) {
-    if (depth >= SL_PATH.length) return injectIntoSectionList(buf);
-    var target = SL_PATH[depth], fields;
+  // 只保留方案卡 section，其余全删；若一个都没有则用内置块兜底
+  function slimSectionList(buf) {
+    var fields;
     try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
-    var out = [], done = false;
+    var contents = [], others = [];
+    for (var i = 0; i < fields.length; i++) {
+      var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
+      if (fn === 1 && wt === 2) contents.push(v);
+      else others.push([fn, wt, v]);
+    }
+    var kept = [];
+    for (var j = 0; j < contents.length; j++) if (isOfferSection(contents[j])) kept.push(contents[j]);
+    var source = "live";
+    if (!kept.length) { kept = [b64decode(OFFER_B64)]; source = "builtin"; }
+
+    var out = [];
+    for (var k = 0; k < kept.length; k++) out.push([1, 2, kept[k]]);
+    for (var m = 0; m < others.length; m++) out.push(others[m]);
+    return { bytes: serialize(out), source: source, kept: kept.length, dropped: contents.length - kept.length };
+  }
+
+  // 沿固定路径下钻，把 sectionList 替换成精简版
+  function descend(buf, depth) {
+    var fields;
+    try { fields = parseFields(buf, 0, buf.length); } catch (e) { return null; }
+    if (depth >= SL_PATH.length) {
+      var r = slimSectionList(buf);
+      return r ? { bytes: r.bytes, info: r } : null;
+    }
+    var target = SL_PATH[depth], out = [], done = false, info = null;
     for (var i = 0; i < fields.length; i++) {
       var fn = fields[i][0], wt = fields[i][1], v = fields[i][2];
       if (fn === target && wt === 2 && !done) {
         var sub = descend(v, depth + 1);
-        if (sub) { out.push([fn, 2, sub]); done = true; continue; }
+        if (sub) { out.push([fn, 2, sub.bytes]); done = true; info = sub.info; continue; }
       }
       out.push([fn, wt, v]);
     }
-    return done ? serialize(out) : null;
+    return done ? { bytes: serialize(out), info: info } : null;
   }
 
   // ---------------- 主流程 ----------------
   var body = $response.body;
   if (!body || typeof body.length !== "number") { $done({}); return; }
 
-  var probe = toStr(body);
-  var isPremium = probe.indexOf("premium_page_section_list") >= 0;
-  if (!isPremium) { $done({}); return; }               // 不是 Premium 页，放行
+  if (!contains(body, "premium_page_section_list")) { $done({}); return; }  // 非 Premium 页放行
 
-  var hasSku = probe.indexOf("com.google.youtube.") >= 0 || probe.indexOf("unlimited.P.") >= 0;
+  var top;
+  try { top = parseFields(body, 0, body.length); } catch (e) { console.log(TAG + " parse fail"); $done({}); return; }
 
-  // A 档：好页面（有真实商品号且无 _NFT）—— 原样放行
-  if (hasSku && probe.indexOf("_NFT") < 0) {
-    console.log(TAG + " A: good page -> pass untouched");
-    $done({}); return;
-  }
+  var f9 = null;
+  for (var i = 0; i < top.length; i++) if (top[i][0] === 9 && top[i][1] === 2) f9 = top[i][2];
+  if (!f9) { console.log(TAG + " no field9"); $done({}); return; }
 
-  // B 档：有商品号但带 _NFT —— 只去 _NFT
-  if (hasSku) {
-    var r1 = deNFT(body);
-    if (r1 && skuPatched.length) {
-      console.log(TAG + " B: de-NFT [" + skuPatched.join(", ") + "] " + body.length + "->" + r1.length + "B");
-      $done({ body: new Uint8Array(r1) }); return;
-    }
-    console.log(TAG + " B: _NFT present but unmapped -> pass");
-    $done({}); return;
-  }
-
-  // C 档：没有商品号（无按钮/空方案区）—— 注入方案卡块
-  var top, fields9 = null;
-  try { top = parseFields(body, 0, body.length); } catch (e) { top = null; }
-  if (top) {
-    for (var i = 0; i < top.length; i++) if (top[i][0] === 9 && top[i][1] === 2) fields9 = top[i][2];
-  }
-  if (!fields9) { console.log(TAG + " C: no field9 -> pass"); $done({}); return; }
-
-  var newF9 = descend(fields9, 0);
-  if (!newF9) { console.log(TAG + " C: sectionList not found -> pass"); $done({}); return; }
+  var res = descend(f9, 0);
+  if (!res) { console.log(TAG + " sectionList not found -> pass"); $done({}); return; }
 
   var out = [], hit = false;
   for (var k = 0; k < top.length; k++) {
-    if (top[k][0] === 9 && top[k][1] === 2 && !hit) { out.push([9, 2, newF9]); hit = true; }
+    if (top[k][0] === 9 && top[k][1] === 2 && !hit) { out.push([9, 2, res.bytes]); hit = true; }
     else out.push([top[k][0], top[k][1], top[k][2]]);
   }
-  var res = new Uint8Array(serialize(out));
-  console.log(TAG + " C: injected offer cards " + body.length + " -> " + res.length + "B");
-  $done({ body: res });
+  var final = new Uint8Array(serialize(out));
+  console.log(TAG + " slim: " + res.info.source + " kept=" + res.info.kept +
+              " dropped=" + res.info.dropped + "  " + body.length + " -> " + final.length + "B");
+  $done({ body: final });
 })();
