@@ -184,7 +184,24 @@
     return ch?ser(out):buf;
   }
   var newTarget=recalcTarget(target);
-  var newF9=ser([[1,2,newTarget]]);
+  // 关键：保留 field9 的完整包装链 58173949/1/58174010/4/49399797，只替换 49399797 的 section 列表
+  var PATH=[58173949,1,58174010,4,49399797];
+  function replaceSections(buf,depth){
+    var fs;try{fs=parse(buf,0,buf.length);}catch(e){return buf;}
+    if(depth===PATH.length){
+      // 到达 49399797：field1 列表换成 [newTarget]，保留 f4/f13 等其它字段
+      var out=[[1,2,newTarget]];
+      for(var i=0;i<fs.length;i++){ if(!(fs[i][0]===1&&fs[i][1]===2)) out.push([fs[i][0],fs[i][1],fs[i][2]]); }
+      return ser(out);
+    }
+    var out=[];
+    for(var i=0;i<fs.length;i++){var f=fs[i][0],w=fs[i][1],v=fs[i][2];
+      if(f===PATH[depth]&&w===2){ out.push([f,w,replaceSections(v,depth+1)]); }
+      else out.push([f,w,v]);
+    }
+    return ser(out);
+  }
+  var newF9=replaceSections(f9,0);
   var outb=[];
   for(var i=0;i<top.length;i++){
     if(top[i][0]===9&&top[i][1]===2) outb.push([9,2,newF9]);
