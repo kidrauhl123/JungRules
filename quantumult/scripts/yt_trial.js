@@ -139,7 +139,7 @@
     for(var q=0;q<f470s.length;q++){
       var cards=findn(f470s[q],482325666);
       var prods={}; for(var c=0;c<cards.length;c++){prods[cardProduct(cards[c])]=1;}
-      if(prods["personal"]&&prods["family"]){ target=sections[si]; break; }
+      if(prods["personal"]||prods["family"]){ target=sections[si]; break; }
     }
     if(target)break;
   }
