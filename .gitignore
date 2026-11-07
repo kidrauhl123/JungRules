@@ -1,0 +1,8 @@
+# 抓包记录含账号隐私（Authorization token、cookie），永不入库
+抓包记录/
+*.har
+*.HAR
+
+# 系统文件
+.DS_Store
+**/.DS_Store

@@ -1,0 +1,11 @@
+# Cloudflare Worker 命令行部署配置（可选，网页控制台部署不需要这个）
+name = "jung-github-proxy"
+main = "github-private-proxy.js"
+compatibility_date = "2024-11-01"
+
+# 变量请在 Cloudflare 后台或用 `wrangler secret put` 设置，不要写死在这里：
+#   wrangler secret put GITHUB_TOKEN
+#   wrangler secret put PROXY_SECRET
+#   wrangler secret put REPO_OWNER
+#   wrangler secret put REPO_NAME
+#   wrangler secret put BRANCH
