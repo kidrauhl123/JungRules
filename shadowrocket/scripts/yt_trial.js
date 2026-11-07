@@ -1,3 +1,51 @@
+/**
+ * ============================================================================
+ * YouTube Premium 页 —— 无条件购买按钮接管脚本（Surge / Quantumult X / 小火箭）
+ * ============================================================================
+ *
+ * 【设计原则：无条件接管】
+ *   本脚本的唯一目标是：让【任何账号】打开 App 内 YouTube Premium 页时，
+ *   页面都被强制替换为「个人试用 / 家庭试用」两个购买按钮。
+ *
+ *   注意：这是「页面外观」层面的强制接管，不保证 Google 服务端最终放行
+ *   该笔交易。脚本只负责让按钮出现且可点击；付款是否成功取决于账号所在
+ *   地区、令牌归属等 Google 服务端因素，不在本脚本职责范围内。
+ *
+ * 【两级处理策略】
+ *   匹配条件：响应体包含 premium_page_section_list（即确认为 Premium 页）。
+ *   其它页面（首页/搜索/设置等）一律原样放行，不做任何改动。
+ *
+ *   Case A —— 页面本身带「个人/家庭」方案卡（482325666）：
+ *     就地改造这些卡片的购买命令为 0 元试用（去 _NFT、f8.31=1、
+ *     f8.17 改试用渠道、删 f8.2），改按钮/价格文案。保留页面原生结构。
+ *
+ *   Case C —— 页面没有任何方案卡（如"国家/地区尚未推出""无法验证国家"
+ *             等错误页）：
+ *     复用页面自带的 471037237 块（App 自己就在渲染它，故渲染器 hash
+ *     必然匹配当前版本），复制成个人/家庭两块，把按钮命令换成购买命令。
+ *     若页面块本身不含按钮，则退化为使用脚本内置的烘焙块模板。
+ *     这样即便服务端返回的是"不可购买"的错误页，也能强制显示购买按钮。
+ *
+ * 【购买命令来源优先级（Case C）】
+ *   1) 当前响应中若能找到真实购买命令 → 直接转换为试用命令使用
+ *      （令牌属于本次会话，最新鲜）；
+ *   2) 否则使用脚本内置的烘焙试用命令（令牌为某历史账号的，可能过期或
+ *      不属于当前账号——按钮仍会显示、可点击，但服务端可能拒绝）。
+ *
+ * 【平台适配】
+ *   Quantumult X：$task 存在 → 读 $response.bodyBytes(ArrayBuffer)，
+ *                 返回 $done({bodyBytes: ArrayBuffer})
+ *   Surge / 小火箭：读 $response.body，返回 $done({body: Uint8Array})
+ *   纯 JS 实现，不依赖 atob / TextDecoder / Array.from 等平台特有 API。
+ *
+ * 【协议要点】
+ *   - Premium 页路径：field9 → 58173949 → 1 → 58174010 → 4 → 49399797
+ *     其下重复 field1 为各 section。组装时必须保留整条包装链，否则白屏。
+ *   - 方案卡：482325666（内含 f3→482327878→f5→461054335 购买按钮）
+ *   - 购买按钮：461054335（f4=购买命令, f5=标签, f19.f1=无障碍标签）
+ *   - 裸按钮块：471037237（f2=标题, f4=按钮wrapper, f8/f11=追踪）
+ * ============================================================================
+ */
 (function(){
   var IS_QX=(typeof $task!=="undefined");
   var body;
@@ -5,6 +53,7 @@
   else{body=$response.body;if(body&&!(body instanceof Uint8Array)&&typeof body!=="string")body=new Uint8Array(body);}
   if(!body||typeof body.length!=="number"){$done({});return;}
 
+  var BAKED_BLOCK="CsoGCpUDCoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoL2M5MTA5MWYwMTllYTZmYzVkMWNiMzllYTBjMTQ0Y2M2YmJjYWNmMGRiZjY3MDZmNmY2MDIyZjcxMDY5ZGY1ZjNfMTkxeDMxLnBuZyC/ASgfCoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoLzUzNzIzZTgzN2M5MDJhMWVhODE0ZGI0Zjc3ODMyZjM4YTZiYjNlMTAxZmI1OTMzYzRmODU2MzZhMjE4YmI3MGJfMzgyeDYyLnBuZyD+Aig+CoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoL2U3YzA4NTBmYWY4MjkwZWFkNjM1ZmIxODhkMjBkZjUwOTVlY2I2ZDUxOGE3ZDNmYmFiYjQyYjUxZTczMDIzMzBfNTczeDkzLnBuZyC9BChdEpUDCoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoLzE4NTVjNGJjZDQ0MTVmNjQzYjZiOTJiZmMyNWI3ZmRiNGQ1OGQ0MDQ3Njc0MmM1Mjc2MGJmYjQzODMzNTYyZDhfMTkxeDMxLnBuZyC/ASgfCoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoL2UxZjJjMGUxMTU2N2NmOTFkMTEyNGEyZTNmYTY5MGU0ZGNkYzZhNDUyMDgwYTdlMDY3ZmU5MDEwZjY1MzQ5NjFfMzgyeDYyLnBuZyD+Aig+CoQBCn1odHRwczovL3d3dy5nc3RhdGljLmNvbS95b3V0dWJlL2ltZy9wcm9tb3MvZ3Jvd3RoLzQ1YTdhZjYzMTAwOGFlOGYzN2IzNzZjOTZjYmM0ZWRiYjcyYTJmOTk3Y2NkNjkxNTFjOWIyNmUxYTBkMDJkZDJfNTczeDkzLnBuZyC9BChdGhgSFllvdVR1YmUgUHJlbWl1bSDlvr3moIcSRgo4WW91VHViZSBQcmVtaXVtIOWcqOS9oOaJgOWcqOeahOWbveWuti/lnLDljLrlsJrmnKrmjqjlh7oyBAgAEA8yBAgPEA8ipgH6l+TeDZ8BIkCyrcmGBToSIQgFEPBbIhMI17GKle71lwMVbmB6BR1ckSUwygEE8jeZMtKg3bkBERIPRkV3aGF0X3RvX3dhdGNoKg7ov5vlhaUgWW91VHViZTgBQhoIBRDwWyITCNexipXu9ZcDFW5gegUdXJElMFgBaARwAYoBE2lkLnlwYy5vZmZlci5idXR0b26aARAKDui/m+WFpSBZb3VUdWJlQhwIBBDgWRgDIhMI17GKle71lwMVbmB6BR1ckSUwWgpHVE0tTlFORlM5";
   var BAKED_P="sq3JhgWHCRIiCFoQnacBIhMIhIP6rNTulwMVsOhMAh3JHzalygEEwW/uA7Kw5+0C3AgKI2NvbS5nb29nbGUueW91dHViZS5yZWQuc3Vic2NyaXB0aW9uEgJVUypjmt6f8QNdCj4KFQoT5q2j5Zyo5r+A5rS75L2g55qEIAoRCg9Zb3VUdWJlIFByZW1pdW0KEgoQIOS8muWRmOi1hOagvO+8gUIbCFsQ2c8BIhMIhIP6rNTulwMVsOhMAh3JHzalOgJBRToCQVI6AkFTOgJBVDoCQVU6AkFXOgJBWjoCQkE6AkJEOgJCRToCQkc6AkJIOgJCTToCQk86AkJSOgJCWToCQ0E6AkNIOgJDTDoCQ086AkNSOgJDWToCQ1o6AkRFOgJESzoCRE86AkRaOgJFQzoCRUU6AkVHOgJFUzoCRkk6AkZSOgJHQjoCR0U6AkdGOgJHSDoCR1A6AkdSOgJHVDoCR1U6AkhLOgJITjoCSFI6AkhVOgJJRDoCSUU6AklMOgJJTjoCSVE6AklTOgJJVDoCSk06AkpPOgJKUDoCS0U6AktIOgJLUjoCS1c6AktZOgJLWjoCTEE6AkxCOgJMSToCTEs6AkxUOgJMVToCTFY6AkxZOgJNQToCTUs6Ak1QOgJNVDoCTVg6Ak1ZOgJORzoCTkk6Ak5MOgJOTzoCTlA6Ak5aOgJPTToCUEE6AlBFOgJQRjoCUEc6AlBIOgJQSzoCUEw6AlBSOgJQVDoCUFk6AlFBOgJSRToCUk86AlJTOgJSVToCU0E6AlNFOgJTRzoCU0k6AlNLOgJTTjoCU1Y6AlRDOgJUSDoCVE46AlRSOgJUVzoCVFo6AlVBOgJVRzoCVVM6AlVZOgJWRToCVkk6AlZOOgJZRToCWkE6AlpXQkMIARoJdW5saW1pdGVkKAVYAWABeAaKARoKGGxwcjItYWNxLWMtdXMtY2F0Y2hhbGwtbbABCcIBAlVTyAEB8AEC+AEBUqYDeXRjZUFJaE5iZjV1ejBLSFdKdFJGTF9aREZqMGtJMUU2LTNFNHZja093RV9MYTFBQnZPZGxrUWtDNVJCbkFRbmhhV2tnLXBOcDE1ZDJMbC1VSUFXMk1PUFJxMDBha3lGX3Q2WjhrMVhrM2VHaF9XRmttTTVkWVhwQzVvMV81SjVZNzkySU5wRDh0aGs4RUY3V01FWVpqZzZId3FYX1IzNTI0UjlHajdUWGg0WGJ1Rjhhem82ZWUtTndlR0YwY1Q1N2htMjhLX0JXWDl0eU9DZmhiRDYzSWlvRmQ4cFBpTDJFNXBTcEtGWHVQUndQTnRPV3ZpY2lLRC1HQ3dvLWJ6VmphNFZld0pVZHdpVHhxN25EdEE1UVI1UGdyc3dxYkppc3U3TVpPRkFsdlA5dmVMY25ZU2o2MEtvWGNIR1ZBT0V1RjctLUJuaDg5NldSWkdUdWZSQmwxWVNHWXRCa2dWME5HSXpjLTdaQmdlUzU2OHBrcmxuX2JQTkZaZGVwS2VxYUFLM3hnLVMzYnVQSlZrSnRxc243TE1SdkNWdDR4TmZGbXd2blE=", BAKED_F="sq3JhgW8CRIiCFcQnacBIhMIhIP6rNTulwMVsOhMAh3JHzalygEEwW/uA7Kw5+0CkQkKKmNvbS5nb29nbGUueW91dHViZS5mYW1pbHkucmVkLnN1YnNjcmlwdGlvbhICVVMqY5ren/EDXQo+ChUKE+ato+WcqOa/gOa0u+S9oOeahCAKEQoPWW91VHViZSBQcmVtaXVtChIKECDkvJrlkZjotYTmoLzvvIFCGwhYENnPASITCISD+qzU7pcDFbDoTAIdyR82pToCQUU6AkFSOgJBUzoCQVQ6AkFVOgJBVzoCQVo6AkJBOgJCRDoCQkU6AkJHOgJCSDoCQk06AkJPOgJCUjoCQlk6AkNBOgJDSDoCQ0w6AkNPOgJDUjoCQ1k6AkNaOgJERToCREs6AkRPOgJEWjoCRUM6AkVFOgJFRzoCRVM6AkZJOgJGUjoCR0I6AkdFOgJHRjoCR0g6AkdQOgJHUjoCR1Q6AkdVOgJISzoCSE46AkhSOgJIVToCSUQ6AklFOgJJTDoCSU46AklROgJJUzoCSVQ6AkpNOgJKTzoCSlA6AktFOgJLSDoCS1I6AktXOgJLWToCS1o6AkxBOgJMQjoCTEk6AkxLOgJMVDoCTFU6AkxWOgJMWToCTUE6Ak1LOgJNUDoCTVQ6Ak1YOgJNWToCTkc6Ak5JOgJOTDoCTk86Ak5QOgJOWjoCT006AlBBOgJQRToCUEY6AlBHOgJQSDoCUEs6AlBMOgJQUjoCUFQ6AlBZOgJRQToCUkU6AlJPOgJSUzoCUlU6AlNBOgJTRToCU0c6AlNJOgJTSzoCU046AlNWOgJUQzoCVEg6AlROOgJUUjoCVFc6AlRaOgJVQToCVUc6AlVTOgJVWToCVkU6AlZJOgJWTjoCWUU6AlpBOgJaV0JHCAEaCXVubGltaXRlZCgFOAFAAVgCYAF4BooBGgoYbHByMi1hY3EtYy11cy1jYXRjaGFsbC1tsAEJwgECVVPIAQHwAQL4AQFS0AN5dGNlQUloTmJmNkVVRW45YTdVbVRoOU9USUFnRmNXcW1QVDNqVkFmS2E2bXpLT1UwOHFFdGhhVDNlV0dxbG13ZFJNTm5DMURXSVdnYW5tWGt0X1FkeEVvRHpNMzhWdUMxc00xcExXMEJfbUI1M0hrU0JDZnVfdHhveGF5SHNRY2F1YmN3VWhnYmJmWmRnV09sQkpnVHpjV2VjYWNyOTl3b1lTLXNockVjbVhhNG5KVjVyZUI0Ymtyb3pqaUJpLTZSRGpjYzg3Y0dZVWpYUE5OWEt5QlI4Q0JHWm4yS3ZQcllORXNud0ZJS0pfWDNORHY4VWVxRFJVTHplM2VGZGNPbWZVWWVJYnEyZ3puVnptTGU5akpEZDg5UG5ZNVd3YXJrY3h4MTdGX21QSzk5MlFkQ0VaUWhqcEIxcmN6M2JpZUxFZWIyRTBnYjZTMEJ2cWs2RXpEVHVCLWRVaGhuTTdFVUZ2cWl5eTV1R1lzc05pVVlLeDVGOVRxSDA3dW55ckp5SGpJTkp6djQwdDZyX2s1RkJnZ085V0R1d0lZQU1kWjhmMmVzcTZrcHpPc0ZOS3lJLU9hQ2xjbTBHV2t0OWZqUnNnYzIyWU0zZ3R1SHFSUg==";
 
   function rv(b,i){var r=0,s=0,x;do{x=b[i++];r+=(x&0x7f)*Math.pow(2,s);s+=7;}while(x&0x80);return[r,i];}
@@ -129,8 +178,10 @@
 
   // ---- Case C: 强制接管 ----
   var blocks=findn(body,471037237);
-  if(!blocks.length){console.log("[yt] 无471037237块，无法接管，放行");$done({});return;}
-  var tplBlock=blocks[0];
+  var tplBlock=null,src2="";
+  for(var bi=0;bi<blocks.length;bi++){ if(findn(blocks[bi],461054335).length){ tplBlock=blocks[bi]; src2="页面自带(带按钮)"; break; } }
+  if(!tplBlock){ tplBlock=b64dec(BAKED_BLOCK); src2="内置烘焙块"; }
+  console.log("[yt] 接管模板块: "+src2);
   // 命令来源: 页面真实命令优先, 否则内置
   var pageP=findPurchaseCmd(body,"red.subscription");
   var pageF=findPurchaseCmd(body,"family.red.subscription");
